@@ -1,6 +1,6 @@
 """
 Production Multi-Carrier REST API & Interactive Web Dashboard.
-Supports Air India Cargo (098) and Lufthansa Cargo (020).
+Supports Air India Cargo (098), Lufthansa Cargo (020), and Emirates SkyCargo (176).
 """
 
 import sys
@@ -21,11 +21,12 @@ from pydantic import BaseModel
 from airindia_tracker.client import AirIndiaCargoClient
 from airindia_tracker.exceptions import AirIndiaTrackerException, AWBNotFoundException
 from lufthansa_tracker.client import LufthansaCargoClient
+from emirates_tracker.client import EmiratesTrackerClient, EmiratesShipmentNotFoundError, EmiratesTrackingError
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
-    description="Industry-level API service for tracking Air India Cargo (098) and Lufthansa Cargo (020).",
-    version="2.0.0",
+    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), and Emirates SkyCargo (176).",
+    version="3.0.0",
 )
 
 app.add_middleware(
@@ -38,6 +39,7 @@ app.add_middleware(
 
 ai_client = AirIndiaCargoClient()
 lh_client = LufthansaCargoClient()
+ek_client = EmiratesTrackerClient()
 
 
 class BatchTrackRequest(BaseModel):
@@ -47,38 +49,54 @@ class BatchTrackRequest(BaseModel):
 
 def detect_carrier(awb: str) -> str:
     cleaned = re.sub(r"[\s\-_]+", "", awb.strip())
+    if cleaned.startswith("176"):
+        return "emirates"
     if cleaned.startswith("020"):
         return "lufthansa"
     if cleaned.startswith("098"):
         return "airindia"
     if len(cleaned) == 8:
-        return "lufthansa"  # If 8 digits passed without prefix, can default or specify
+        return "lufthansa"
     return "airindia"
 
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    return {"status": "healthy", "service": "multi-carrier-cargo-tracker", "carriers": ["Air India (098)", "Lufthansa Cargo (020)"]}
+    return {
+        "status": "healthy",
+        "service": "multi-carrier-cargo-tracker",
+        "carriers": [
+            "Air India (098)",
+            "Lufthansa Cargo (020)",
+            "Emirates SkyCargo (176)",
+        ],
+    }
 
 
 @app.get("/api/v1/track/{awb}", tags=["Tracking"])
-def track_shipment(awb: str, carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', or 'lufthansa'")):
+def track_shipment(
+    awb: str,
+    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', or 'emirates'"),
+):
     """
     Track a shipment by AWB number.
-    Auto-detects Air India (098-XXXXXXXX) or Lufthansa Cargo (020-XXXXXXXX).
+    Auto-detects Air India (098), Lufthansa Cargo (020), or Emirates SkyCargo (176).
     """
-    target_carrier = carrier if carrier in ("airindia", "lufthansa") else detect_carrier(awb)
+    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates") else detect_carrier(awb)
 
     try:
-        if target_carrier == "lufthansa":
+        if target_carrier == "emirates":
+            res = ek_client.track(awb)
+            return {"carrier": "Emirates SkyCargo", "carrier_code": "176", "data": res.dict()}
+        elif target_carrier == "lufthansa":
             res = lh_client.track(awb)
             return {"carrier": "Lufthansa Cargo", "carrier_code": "020", "data": res.dict()}
         else:
             res = ai_client.track(awb)
             return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.dict()}
-    except (AWBNotFoundException, ValueError) as e:
+    except (AWBNotFoundException, EmiratesShipmentNotFoundError, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except AirIndiaTrackerException as e:
+    except (AirIndiaTrackerException, EmiratesTrackingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
@@ -86,12 +104,14 @@ def track_shipment(awb: str, carrier: Optional[str] = Query("auto", description=
 
 @app.post("/api/v1/track/batch", tags=["Tracking"])
 def track_batch(payload: BatchTrackRequest):
-    """Track multiple AWBs concurrently."""
+    """Track multiple AWBs concurrently across multiple carriers."""
     results = {}
     for awb in payload.awbs:
-        target = payload.carrier if payload.carrier in ("airindia", "lufthansa") else detect_carrier(awb)
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates") else detect_carrier(awb)
         try:
-            if target == "lufthansa":
+            if target == "emirates":
+                results[awb] = {"carrier": "Emirates SkyCargo", "status": "success", "data": ek_client.track(awb).dict()}
+            elif target == "lufthansa":
                 results[awb] = {"carrier": "Lufthansa Cargo", "status": "success", "data": lh_client.track(awb).dict()}
             else:
                 results[awb] = {"carrier": "Air India Cargo", "status": "success", "data": ai_client.track(awb).dict()}
@@ -102,20 +122,22 @@ def track_batch(payload: BatchTrackRequest):
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def web_dashboard():
-    """Interactive Web Dashboard for Air India & Lufthansa Cargo."""
+    """Interactive Web Dashboard for Air India, Lufthansa Cargo & Emirates SkyCargo."""
     return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Cargo Shipment Tracker</title>
+    <title>Global Air Cargo Shipment Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-lh: #05164d;
             --accent-lh: #ffb800;
             --primary-ai: #d71921;
+            --primary-ek: #d71920;
+            --accent-ek: #c49a45;
             --bg: #f8fafc;
             --card-bg: #ffffff;
             --text-main: #0f172a;
@@ -125,12 +147,13 @@ def web_dashboard():
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: var(--bg); color: var(--text-main); padding: 2rem 1rem; }
-        .container { max-width: 1050px; margin: 0 auto; }
+        .container { max-width: 1080px; margin: 0 auto; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
-        .logo-wrap { display: flex; align-items: center; gap: 12px; }
-        .badge-ai { background: var(--primary-ai); color: white; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; }
-        .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; }
-        .title { font-size: 1.3rem; font-weight: 700; color: #1e293b; }
+        .logo-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .badge-ek { background: #b91c1c; color: #fef08a; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #dc2626; }
+        .badge-ai { background: var(--primary-ai); color: white; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
+        .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
+        .title { font-size: 1.35rem; font-weight: 700; color: #1e293b; margin-left: 6px; }
         .search-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
         .form-row { display: flex; gap: 12px; }
         .carrier-select { padding: 0.85rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-weight: 600; background: white; outline: none; }
@@ -138,13 +161,13 @@ def web_dashboard():
         input[type="text"]:focus { border-color: #2563eb; }
         button.btn-search { background: #2563eb; color: white; border: none; padding: 0.85rem 1.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: opacity 0.2s; }
         button.btn-search:hover { opacity: 0.9; }
-        .quick-links { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 10px; align-items: center; }
-        .quick-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #334155; font-family: monospace; }
+        .quick-links { margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .quick-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #334155; font-family: monospace; font-size: 0.82rem; }
         .quick-btn:hover { background: #e2e8f0; }
         .result-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; }
         .card-top { padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .awb-num { font-size: 1.35rem; font-weight: 700; }
-        .status-pill { padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+        .awb-num { font-size: 1.4rem; font-weight: 700; }
+        .status-pill { padding: 5px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
         .banner { padding: 1rem 1.75rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; font-size: 0.95rem; font-weight: 500; color: #1e40af; }
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); }
         .m-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
@@ -152,23 +175,25 @@ def web_dashboard():
         .tab-bar { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; }
         .tab-item { padding: 1rem 1.25rem; border: none; background: none; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
         .tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }
-        .tab-panel { padding: 1.5rem 1.75rem; }
+        .tab-panel { padding: 1.5rem 1.75rem; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
         th { padding: 0.75rem 1rem; background: #f8fafc; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
         td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
         tr:hover { background: #f8fafc; }
         .badge-ev { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-family: monospace; }
-        .loader { display: none; text-align: center; padding: 2rem; font-weight: 600; color: var(--text-muted); }
-        .error-msg { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+        .badge-latest { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.8rem; }
+        .loader { display: none; text-align: center; padding: 2.5rem; font-weight: 600; color: var(--text-muted); font-size: 1.05rem; }
+        .error-msg { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="logo-wrap">
-                <span class="badge-ai">AIR INDIA (098)</span>
+                <span class="badge-ek">EMIRATES (176)</span>
                 <span class="badge-lh">LUFTHANSA (020)</span>
-                <span class="title">Cargo Shipment Tracker</span>
+                <span class="badge-ai">AIR INDIA (098)</span>
+                <span class="title">Global Cargo Tracker</span>
             </div>
             <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Swagger API ↗</a>
         </div>
@@ -177,14 +202,16 @@ def web_dashboard():
             <div class="form-row">
                 <select id="carrierSelect" class="carrier-select">
                     <option value="auto">Auto-Detect Carrier</option>
+                    <option value="emirates">Emirates SkyCargo (176)</option>
                     <option value="lufthansa">Lufthansa Cargo (020)</option>
                     <option value="airindia">Air India Cargo (098)</option>
                 </select>
-                <input type="text" id="awbInput" placeholder="Enter AWB Number (e.g. 020-04585280, 04676405, 098-30244056)" value="020-04585280" />
+                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 176-63116340, 020-04585280, 098-30244056)" value="176-63116340" />
                 <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
             </div>
             <div class="quick-links">
-                <span>Sample AWBs:</span>
+                <span>Quick Samples:</span>
+                <button class="quick-btn" onclick="setAwb('176-63116340', 'emirates')">176-63116340 (Emirates)</button>
                 <button class="quick-btn" onclick="setAwb('020-04585280', 'lufthansa')">020-04585280 (Lufthansa)</button>
                 <button class="quick-btn" onclick="setAwb('04676405', 'lufthansa')">04676405 (Lufthansa 8-digit)</button>
                 <button class="quick-btn" onclick="setAwb('098-30244056', 'airindia')">098-30244056 (Air India)</button>
@@ -215,18 +242,18 @@ def web_dashboard():
                     <div class="m-val" id="pcsWeightDisplay">--- pcs / --- KG</div>
                 </div>
                 <div>
-                    <div class="m-lbl">Volume</div>
-                    <div class="m-val" id="volumeDisplay">--- CBM</div>
+                    <div class="m-lbl">Volume / Chargeable</div>
+                    <div class="m-val" id="volumeDisplay">---</div>
                 </div>
                 <div>
-                    <div class="m-lbl">Product / Details</div>
+                    <div class="m-lbl">Commodity / Product</div>
                     <div class="m-val" id="productDisplay">---</div>
                 </div>
             </div>
 
             <div class="tab-bar">
                 <button class="tab-item active" onclick="switchTab('flights')">Flights & Routing</button>
-                <button class="tab-item" onclick="switchTab('history')">Status History (Events)</button>
+                <button class="tab-item" onclick="switchTab('history')">Milestones & History</button>
             </div>
 
             <div class="tab-panel" id="panelFlights">
@@ -237,7 +264,8 @@ def web_dashboard():
                             <th>Origin ➔ Destination</th>
                             <th>Departure Time</th>
                             <th>Arrival Time</th>
-                            <th>Pieces / Type</th>
+                            <th>Aircraft / Type</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="flightsBody"></tbody>
@@ -253,7 +281,6 @@ def web_dashboard():
                             <th>Description</th>
                             <th>Station</th>
                             <th>Pieces / Weight</th>
-                            <th>Flight</th>
                             <th>State</th>
                         </tr>
                     </thead>
@@ -297,9 +324,66 @@ def web_dashboard():
                 document.getElementById('carrierTag').innerText = cName;
                 document.getElementById('awbDisplay').innerText = data.formatted_awb;
 
-                // Airline-specific styling
                 const topBar = document.getElementById('cardTop');
-                if (cName.includes('Lufthansa')) {
+
+                if (cName.includes('Emirates')) {
+                    // Emirates SkyCargo
+                    topBar.style.background = '#fef2f2';
+                    document.getElementById('statusPill').style.background = '#991b1b';
+                    document.getElementById('statusPill').style.color = '#fef08a';
+                    document.getElementById('statusPill').innerText = data.overview.latest_milestone_code || 'CONFIRMED';
+                    
+                    const latestDesc = `${data.overview.latest_milestone_code} - ${data.overview.latest_milestone_description} @ ${data.overview.latest_milestone_station || '---'} (${data.overview.latest_milestone_time || 'N/A'})`;
+                    document.getElementById('latestBanner').innerHTML = `<strong>Latest Milestone:</strong> ${latestDesc} &bull; <em>${data.overview.order_status}</em>`;
+
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin.code} (${data.overview.origin.name || ''}) ➔ ${data.overview.destination.code} (${data.overview.destination.name || ''})`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces} pcs / ${data.overview.gross_weight} ${data.overview.weight_unit}`;
+                    
+                    const chgWt = data.overview.chargeable_weight ? ` / ${data.overview.chargeable_weight} ${data.overview.weight_unit}` : '';
+                    document.getElementById('volumeDisplay').innerText = `${data.overview.volume} ${data.overview.volume_unit}${chgWt}`;
+                    
+                    const spCodes = (data.overview.special_handling_codes || []).join(', ');
+                    document.getElementById('productDisplay').innerText = `${data.overview.commodity || data.overview.product_name || 'Pharma Plus'} ${spCodes ? '[' + spCodes + ']' : ''}`;
+
+                    // Flights / Itinerary
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.itinerary || []).forEach(leg => {
+                        const dep = leg.actual_departure ? `${leg.actual_departure} (Sched: ${leg.scheduled_departure || ''})` : (leg.scheduled_departure || 'N/A');
+                        const arr = leg.actual_arrival ? `${leg.actual_arrival} (Sched: ${leg.scheduled_arrival || ''})` : (leg.scheduled_arrival || 'N/A');
+                        const ac = [leg.aircraft_type, leg.registration_number ? `Reg: ${leg.registration_number}` : ''].filter(Boolean).join(' | ') || 'Aircraft';
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong>${leg.flight_display}</strong></td>
+                                <td>${leg.origin.code} ➔ ${leg.destination.code}</td>
+                                <td>${dep}</td>
+                                <td>${arr}</td>
+                                <td>${ac}</td>
+                                <td><span class="badge-ev">${leg.movement_status || 'CONF'}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Milestones
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.milestones || []).forEach(m => {
+                        const pcsWt = [m.pieces ? `${m.pieces} pcs` : '', m.weight ? `${m.weight} ${m.weight_unit}` : ''].filter(Boolean).join(' / ') || '---';
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Archived</span>';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${m.timestamp || 'N/A'}</td>
+                                <td><span class="badge-ev">${m.code}</span></td>
+                                <td>${m.description}</td>
+                                <td><strong>${m.station || '---'}</strong></td>
+                                <td>${pcsWt}</td>
+                                <td>${badge}</td>
+                            </tr>
+                        `;
+                    });
+
+                } else if (cName.includes('Lufthansa')) {
+                    // Lufthansa Cargo
                     topBar.style.background = '#fffdf0';
                     document.getElementById('statusPill').style.background = '#05164d';
                     document.getElementById('statusPill').style.color = '#ffb800';
@@ -322,6 +406,7 @@ def web_dashboard():
                                 <td>${f.actual_departure || f.scheduled_departure || 'N/A'}</td>
                                 <td>${f.actual_arrival || f.scheduled_arrival || 'N/A'}</td>
                                 <td>${f.aircraft_type || 'Aircraft'}</td>
+                                <td><span class="badge-ev">CONF</span></td>
                             </tr>
                         `;
                     });
@@ -331,7 +416,7 @@ def web_dashboard():
                     hBody.innerHTML = '';
                     (data.status_history || []).forEach(h => {
                         const pcsWt = [h.pieces ? `${h.pieces} pcs` : '', h.weight ? `${h.weight} kg` : ''].filter(Boolean).join(' / ') || '---';
-                        const stateBadge = h.is_actual ? '<span style="color: #16a34a; font-weight: 600;">Actual</span>' : '<span style="color: #64748b;">Planned</span>';
+                        const stateBadge = h.is_actual ? '<span class="badge-latest">Actual</span>' : '<span style="color: #64748b;">Planned</span>';
                         hBody.innerHTML += `
                             <tr>
                                 <td>${h.event_time || 'N/A'}</td>
@@ -339,14 +424,13 @@ def web_dashboard():
                                 <td>${h.event_name}</td>
                                 <td>${h.station || '---'}</td>
                                 <td>${pcsWt}</td>
-                                <td>${h.flight_number || '---'}</td>
                                 <td>${stateBadge}</td>
                             </tr>
                         `;
                     });
 
                 } else {
-                    // Air India
+                    // Air India Cargo
                     topBar.style.background = '#fff5f5';
                     document.getElementById('statusPill').style.background = data.overview.overall_status === 'DELIVERED' ? '#16a34a' : '#d97706';
                     document.getElementById('statusPill').style.color = 'white';
@@ -369,6 +453,7 @@ def web_dashboard():
                                 <td>${s.departure_date || ''} ${s.departure_time || ''}</td>
                                 <td>${s.arrival_date || ''} ${s.arrival_time || ''}</td>
                                 <td>${s.pieces || '---'} pcs</td>
+                                <td><span class="badge-ev">CONF</span></td>
                             </tr>
                         `;
                     });
@@ -378,7 +463,6 @@ def web_dashboard():
                     hBody.innerHTML = '';
                     (data.activity_view || []).forEach(ev => {
                         const pcsWt = [ev.pieces !== null ? `${ev.pieces} pcs` : '', ev.weight !== null ? `${ev.weight} ${ev.weight_unit}` : ''].filter(Boolean).join(' / ') || '---';
-                        const flUld = [ev.flight_number ? `${ev.flight_carrier_code || 'AI'} ${ev.flight_number}` : '', ev.uld_number ? `ULD: ${ev.uld_number}` : ''].filter(Boolean).join(' | ') || '---';
                         hBody.innerHTML += `
                             <tr>
                                 <td>${ev.event_time || ev.last_updated_time || '---'}</td>
@@ -386,8 +470,7 @@ def web_dashboard():
                                 <td>${ev.event_name}</td>
                                 <td>${ev.airport_code || '---'}</td>
                                 <td>${pcsWt}</td>
-                                <td>${flUld}</td>
-                                <td><span style="color: #16a34a; font-weight: 600;">Recorded</span></td>
+                                <td><span class="badge-latest">Recorded</span></td>
                             </tr>
                         `;
                     });
