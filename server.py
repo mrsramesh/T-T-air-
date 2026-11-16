@@ -1,6 +1,6 @@
 """
-FastAPI Production REST API & Web Dashboard for Air India Cargo Tracking.
-Includes OpenAPI/Swagger docs, JSON endpoints, batch tracking, and interactive web UI.
+Production Multi-Carrier REST API & Interactive Web Dashboard.
+Supports Air India Cargo (098) and Lufthansa Cargo (020).
 """
 
 import sys
@@ -11,23 +11,23 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from typing import List
+import re
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from airindia_tracker.client import AirIndiaCargoClient
-from airindia_tracker.models import TrackingResult
 from airindia_tracker.exceptions import AirIndiaTrackerException, AWBNotFoundException
+from lufthansa_tracker.client import LufthansaCargoClient
 
 app = FastAPI(
-    title="Air India Cargo Tracking API",
-    description="Industry-level API service for tracking Air India Cargo (iCargo Neo) shipments.",
-    version="1.0.0",
+    title="Multi-Carrier Air Cargo Tracking API",
+    description="Industry-level API service for tracking Air India Cargo (098) and Lufthansa Cargo (020).",
+    version="2.0.0",
 )
 
-# Enable CORS for cross-origin integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,101 +36,128 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = AirIndiaCargoClient()
+ai_client = AirIndiaCargoClient()
+lh_client = LufthansaCargoClient()
 
 
 class BatchTrackRequest(BaseModel):
     awbs: List[str]
+    carrier: Optional[str] = "auto"
+
+
+def detect_carrier(awb: str) -> str:
+    cleaned = re.sub(r"[\s\-_]+", "", awb.strip())
+    if cleaned.startswith("020"):
+        return "lufthansa"
+    if cleaned.startswith("098"):
+        return "airindia"
+    if len(cleaned) == 8:
+        return "lufthansa"  # If 8 digits passed without prefix, can default or specify
+    return "airindia"
 
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "air-india-cargo-tracker"}
+    return {"status": "healthy", "service": "multi-carrier-cargo-tracker", "carriers": ["Air India (098)", "Lufthansa Cargo (020)"]}
 
 
-@app.get("/api/v1/track/{awb}", response_model=TrackingResult, tags=["Tracking"])
-def track_shipment(awb: str):
+@app.get("/api/v1/track/{awb}", tags=["Tracking"])
+def track_shipment(awb: str, carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', or 'lufthansa'")):
     """
-    Track a single Air India Cargo shipment by AWB number.
-    Accepts formats: '098-30244056', '09830244056', '30244056'.
-    Returns overview, tracking_view (flight legs), and activity_view (audit events).
+    Track a shipment by AWB number.
+    Auto-detects Air India (098-XXXXXXXX) or Lufthansa Cargo (020-XXXXXXXX).
     """
+    target_carrier = carrier if carrier in ("airindia", "lufthansa") else detect_carrier(awb)
+
     try:
-        return client.track(awb)
-    except AWBNotFoundException as e:
+        if target_carrier == "lufthansa":
+            res = lh_client.track(awb)
+            return {"carrier": "Lufthansa Cargo", "carrier_code": "020", "data": res.dict()}
+        else:
+            res = ai_client.track(awb)
+            return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.dict()}
+    except (AWBNotFoundException, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
     except AirIndiaTrackerException as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
 
 
 @app.post("/api/v1/track/batch", tags=["Tracking"])
 def track_batch(payload: BatchTrackRequest):
-    """Track multiple Air India Cargo AWBs concurrently."""
-    return client.track_batch(payload.awbs)
+    """Track multiple AWBs concurrently."""
+    results = {}
+    for awb in payload.awbs:
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa") else detect_carrier(awb)
+        try:
+            if target == "lufthansa":
+                results[awb] = {"carrier": "Lufthansa Cargo", "status": "success", "data": lh_client.track(awb).dict()}
+            else:
+                results[awb] = {"carrier": "Air India Cargo", "status": "success", "data": ai_client.track(awb).dict()}
+        except Exception as e:
+            results[awb] = {"status": "error", "error": str(e)}
+    return results
 
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def web_dashboard():
-    """Interactive Web Dashboard with Tracking View and Activity View."""
-    html_content = """
+    """Interactive Web Dashboard for Air India & Lufthansa Cargo."""
+    return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Air India Cargo Shipment Tracker</title>
+    <title>Global Cargo Shipment Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #d71921;
-            --primary-hover: #b8141b;
+            --primary-lh: #05164d;
+            --accent-lh: #ffb800;
+            --primary-ai: #d71921;
             --bg: #f8fafc;
             --card-bg: #ffffff;
             --text-main: #0f172a;
             --text-muted: #64748b;
             --border: #e2e8f0;
             --success: #16a34a;
-            --warning: #f59e0b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: var(--bg); color: var(--text-main); padding: 2rem 1rem; }
-        .container { max-width: 1000px; margin: 0 auto; }
+        .container { max-width: 1050px; margin: 0 auto; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-badge { background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; letter-spacing: 1px; }
-        .logo-title { font-size: 1.3rem; font-weight: 700; color: #1e293b; }
-        .search-card { background: var(--card-bg); border-radius: 12px; padding: 1.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
-        .search-form { display: flex; gap: 12px; }
-        .input-group { flex: 1; }
-        input[type="text"] { width: 100%; padding: 0.85rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
-        input[type="text"]:focus { border-color: var(--primary); }
-        button.btn-primary { background: var(--primary); color: white; border: none; padding: 0.85rem 1.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 1rem; }
-        button.btn-primary:hover { background: var(--primary-hover); }
+        .logo-wrap { display: flex; align-items: center; gap: 12px; }
+        .badge-ai { background: var(--primary-ai); color: white; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; }
+        .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; }
+        .title { font-size: 1.3rem; font-weight: 700; color: #1e293b; }
+        .search-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .form-row { display: flex; gap: 12px; }
+        .carrier-select { padding: 0.85rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-weight: 600; background: white; outline: none; }
+        input[type="text"] { flex: 1; padding: 0.85rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; }
+        input[type="text"]:focus { border-color: #2563eb; }
+        button.btn-search { background: #2563eb; color: white; border: none; padding: 0.85rem 1.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: opacity 0.2s; }
+        button.btn-search:hover { opacity: 0.9; }
+        .quick-links { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 10px; align-items: center; }
+        .quick-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #334155; font-family: monospace; }
+        .quick-btn:hover { background: #e2e8f0; }
         .result-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; }
-        .shipment-header { background: #fff5f5; border-bottom: 1px solid #fee2e2; padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; }
-        .awb-badge { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
-        .status-badge { background: var(--success); color: white; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); }
-        .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
-        .stat-value { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
-        .milestones-bar { display: flex; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); background: #fafafa; gap: 1rem; }
-        .m-step { flex: 1; text-align: center; position: relative; }
-        .m-circle { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 700; }
-        .m-done .m-circle { background: #dcfce7; color: var(--success); border: 2px solid var(--success); }
-        .m-pending .m-circle { background: #f1f5f9; color: var(--text-muted); border: 2px solid var(--border); }
-        .m-name { font-size: 0.8rem; font-weight: 600; color: #334155; }
-        .tab-nav { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; }
-        .tab-btn { padding: 1rem 1.5rem; border: none; background: none; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
-        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
-        .tab-content { padding: 1.75rem; }
+        .card-top { padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .awb-num { font-size: 1.35rem; font-weight: 700; }
+        .status-pill { padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+        .banner { padding: 1rem 1.75rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; font-size: 0.95rem; font-weight: 500; color: #1e40af; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); }
+        .m-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+        .m-val { font-size: 1.15rem; font-weight: 700; color: #1e293b; }
+        .tab-bar { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; }
+        .tab-item { padding: 1rem 1.25rem; border: none; background: none; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }
+        .tab-panel { padding: 1.5rem 1.75rem; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
         th { padding: 0.75rem 1rem; background: #f8fafc; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
         td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
         tr:hover { background: #f8fafc; }
-        .badge-event { background: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-family: monospace; }
+        .badge-ev { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-family: monospace; }
         .loader { display: none; text-align: center; padding: 2rem; font-weight: 600; color: var(--text-muted); }
         .error-msg { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
     </style>
@@ -138,58 +165,71 @@ def web_dashboard():
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">
-                <span class="logo-badge">AIR INDIA</span>
-                <span class="logo-title">Cargo Shipment Tracking Portal</span>
+            <div class="logo-wrap">
+                <span class="badge-ai">AIR INDIA (098)</span>
+                <span class="badge-lh">LUFTHANSA (020)</span>
+                <span class="title">Cargo Shipment Tracker</span>
             </div>
-            <a href="/docs" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem;">API Documentation (Swagger) ↗</a>
+            <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Swagger API ↗</a>
         </div>
 
         <div class="search-card">
-            <div class="search-form">
-                <div class="input-group">
-                    <input type="text" id="awbInput" placeholder="Enter AWB Number (e.g. 098-30244056)" value="098-30244056" />
-                </div>
-                <button class="btn-primary" onclick="trackAWB()">Track Shipment</button>
+            <div class="form-row">
+                <select id="carrierSelect" class="carrier-select">
+                    <option value="auto">Auto-Detect Carrier</option>
+                    <option value="lufthansa">Lufthansa Cargo (020)</option>
+                    <option value="airindia">Air India Cargo (098)</option>
+                </select>
+                <input type="text" id="awbInput" placeholder="Enter AWB Number (e.g. 020-04585280, 04676405, 098-30244056)" value="020-04585280" />
+                <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
+            </div>
+            <div class="quick-links">
+                <span>Sample AWBs:</span>
+                <button class="quick-btn" onclick="setAwb('020-04585280', 'lufthansa')">020-04585280 (Lufthansa)</button>
+                <button class="quick-btn" onclick="setAwb('04676405', 'lufthansa')">04676405 (Lufthansa 8-digit)</button>
+                <button class="quick-btn" onclick="setAwb('098-30244056', 'airindia')">098-30244056 (Air India)</button>
             </div>
         </div>
 
         <div class="error-msg" id="errorBox"></div>
-        <div class="loader" id="loader">Fetching tracking details from Air India iCargo Portal...</div>
+        <div class="loader" id="loader">Fetching tracking details from airline cargo portal...</div>
 
         <div class="result-card" id="resultCard">
-            <div class="shipment-header">
-                <div class="awb-badge" id="awbDisplay">098-00000000</div>
-                <div class="status-badge" id="statusBadge">STATUS</div>
+            <div class="card-top" id="cardTop">
+                <div>
+                    <span id="carrierTag" style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 2px;">AIRLINE</span>
+                    <div class="awb-num" id="awbDisplay">000-00000000</div>
+                </div>
+                <div class="status-pill" id="statusPill" style="background: #16a34a; color: white;">STATUS</div>
             </div>
 
-            <div class="summary-grid">
+            <div class="banner" id="latestBanner">Latest Event: ...</div>
+
+            <div class="metrics-grid">
                 <div>
-                    <div class="stat-label">Routing</div>
-                    <div class="stat-value" id="routeDisplay">DEL ➔ YYZ</div>
+                    <div class="m-lbl">Origin ➔ Destination</div>
+                    <div class="m-val" id="routeDisplay">--- ➔ ---</div>
                 </div>
                 <div>
-                    <div class="stat-label">Pieces / Weight</div>
-                    <div class="stat-value" id="pcsWeightDisplay">43 pcs / 271 KG</div>
+                    <div class="m-lbl">Pieces & Weight</div>
+                    <div class="m-val" id="pcsWeightDisplay">--- pcs / --- KG</div>
                 </div>
                 <div>
-                    <div class="stat-label">Volume</div>
-                    <div class="stat-value" id="volDisplay">2.31 CBM</div>
+                    <div class="m-lbl">Volume</div>
+                    <div class="m-val" id="volumeDisplay">--- CBM</div>
                 </div>
                 <div>
-                    <div class="stat-label">Description / Code</div>
-                    <div class="stat-value" id="descDisplay">CONSOLIDATION (CSL)</div>
+                    <div class="m-lbl">Product / Details</div>
+                    <div class="m-val" id="productDisplay">---</div>
                 </div>
             </div>
 
-            <div class="milestones-bar" id="milestonesBar"></div>
-
-            <div class="tab-nav">
-                <button class="tab-btn active" onclick="switchTab('tracking')">Tracking View (Flight Segments)</button>
-                <button class="tab-btn" onclick="switchTab('activity')">Activity View (Event Timeline)</button>
+            <div class="tab-bar">
+                <button class="tab-item active" onclick="switchTab('flights')">Flights & Routing</button>
+                <button class="tab-item" onclick="switchTab('history')">Status History (Events)</button>
             </div>
 
-            <div class="tab-content" id="tabTracking">
+            <div class="tab-panel" id="panelFlights">
                 <table>
                     <thead>
                         <tr>
@@ -197,34 +237,42 @@ def web_dashboard():
                             <th>Origin ➔ Destination</th>
                             <th>Departure Time</th>
                             <th>Arrival Time</th>
-                            <th>Pieces</th>
+                            <th>Pieces / Type</th>
                         </tr>
                     </thead>
-                    <tbody id="trackingTableBody"></tbody>
+                    <tbody id="flightsBody"></tbody>
                 </table>
             </div>
 
-            <div class="tab-content" id="tabActivity" style="display: none;">
+            <div class="tab-panel" id="panelHistory" style="display: none;">
                 <table>
                     <thead>
                         <tr>
                             <th>Date & Time</th>
                             <th>Code</th>
-                            <th>Event Description</th>
+                            <th>Description</th>
                             <th>Station</th>
                             <th>Pieces / Weight</th>
-                            <th>Flight / ULD</th>
+                            <th>Flight</th>
+                            <th>State</th>
                         </tr>
                     </thead>
-                    <tbody id="activityTableBody"></tbody>
+                    <tbody id="historyBody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
+        function setAwb(awb, carrier) {
+            document.getElementById('awbInput').value = awb;
+            document.getElementById('carrierSelect').value = carrier;
+            trackAWB();
+        }
+
         async function trackAWB() {
             const awb = document.getElementById('awbInput').value.trim();
+            const carrier = document.getElementById('carrierSelect').value;
             if (!awb) return;
 
             const errorBox = document.getElementById('errorBox');
@@ -236,43 +284,85 @@ def web_dashboard():
             loader.style.display = 'block';
 
             try {
-                const res = await fetch(`/api/v1/track/${encodeURIComponent(awb)}`);
-                const data = await res.json();
+                const res = await fetch(`/api/v1/track/${encodeURIComponent(awb)}?carrier=${carrier}`);
+                const envelope = await res.json();
 
                 if (!res.ok) {
-                    throw new Error(data.detail || 'Failed to fetch shipment details');
+                    throw new Error(envelope.detail || 'Shipment tracking failed');
                 }
 
-                // Render Overview
+                const cName = envelope.carrier;
+                const data = envelope.data;
+
+                document.getElementById('carrierTag').innerText = cName;
                 document.getElementById('awbDisplay').innerText = data.formatted_awb;
-                document.getElementById('statusBadge').innerText = data.overview.overall_status;
-                document.getElementById('routeDisplay').innerText = `${data.overview.origin_airport_code} ➔ ${data.overview.destination_airport_code}`;
-                document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces} pcs / ${data.overview.stated_weight} ${data.overview.weight_unit}`;
-                document.getElementById('volDisplay').innerText = `${data.overview.stated_volume} ${data.overview.volume_unit}`;
-                document.getElementById('descDisplay').innerText = `${data.overview.shipment_description || 'General'} (${data.overview.special_handling_code || '---'})`;
 
-                // Render Milestones
-                const mBar = document.getElementById('milestonesBar');
-                mBar.innerHTML = '';
-                data.overview.milestones.forEach(m => {
-                    const isDone = m.is_completed;
-                    const el = document.createElement('div');
-                    el.className = `m-step ${isDone ? 'm-done' : 'm-pending'}`;
-                    el.innerHTML = `
-                        <div class="m-circle">${isDone ? '✓' : '•'}</div>
-                        <div class="m-name">${m.milestone}</div>
-                    `;
-                    mBar.appendChild(el);
-                });
+                // Airline-specific styling
+                const topBar = document.getElementById('cardTop');
+                if (cName.includes('Lufthansa')) {
+                    topBar.style.background = '#fffdf0';
+                    document.getElementById('statusPill').style.background = '#05164d';
+                    document.getElementById('statusPill').style.color = '#ffb800';
+                    document.getElementById('statusPill').innerText = data.overview.latest_event;
+                    document.getElementById('latestBanner').innerText = data.overview.latest_event_description;
 
-                // Render Tracking View (Flights)
-                const tBody = document.getElementById('trackingTableBody');
-                tBody.innerHTML = '';
-                if (!data.tracking_view || data.tracking_view.length === 0) {
-                    tBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">No flight segments recorded.</td></tr>';
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin.code} ➔ ${data.overview.destination.code}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces} pcs / ${data.overview.gross_weight} ${data.overview.weight_unit}`;
+                    document.getElementById('volumeDisplay').innerText = `${data.overview.volume} ${data.overview.volume_unit}`;
+                    document.getElementById('productDisplay').innerText = `${data.overview.product_name || 'General Cargo'}`;
+
+                    // Flights
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flights || []).forEach(f => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong>${f.flight_number}</strong></td>
+                                <td>${f.origin.code} ➔ ${f.destination.code}</td>
+                                <td>${f.actual_departure || f.scheduled_departure || 'N/A'}</td>
+                                <td>${f.actual_arrival || f.scheduled_arrival || 'N/A'}</td>
+                                <td>${f.aircraft_type || 'Aircraft'}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // History
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.status_history || []).forEach(h => {
+                        const pcsWt = [h.pieces ? `${h.pieces} pcs` : '', h.weight ? `${h.weight} kg` : ''].filter(Boolean).join(' / ') || '---';
+                        const stateBadge = h.is_actual ? '<span style="color: #16a34a; font-weight: 600;">Actual</span>' : '<span style="color: #64748b;">Planned</span>';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${h.event_time || 'N/A'}</td>
+                                <td><span class="badge-ev">${h.event_code}</span></td>
+                                <td>${h.event_name}</td>
+                                <td>${h.station || '---'}</td>
+                                <td>${pcsWt}</td>
+                                <td>${h.flight_number || '---'}</td>
+                                <td>${stateBadge}</td>
+                            </tr>
+                        `;
+                    });
+
                 } else {
-                    data.tracking_view.forEach(s => {
-                        tBody.innerHTML += `
+                    // Air India
+                    topBar.style.background = '#fff5f5';
+                    document.getElementById('statusPill').style.background = data.overview.overall_status === 'DELIVERED' ? '#16a34a' : '#d97706';
+                    document.getElementById('statusPill').style.color = 'white';
+                    document.getElementById('statusPill').innerText = data.overview.overall_status;
+                    document.getElementById('latestBanner').innerText = `Air India Cargo: ${data.overview.overall_status} | Description: ${data.overview.shipment_description || 'N/A'}`;
+
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin_airport_code} ➔ ${data.overview.destination_airport_code}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces} pcs / ${data.overview.stated_weight} ${data.overview.weight_unit}`;
+                    document.getElementById('volumeDisplay').innerText = `${data.overview.stated_volume} ${data.overview.volume_unit}`;
+                    document.getElementById('productDisplay').innerText = `${data.overview.product_name || 'AGC'} (${data.overview.special_handling_code || '---'})`;
+
+                    // Flights
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.tracking_view || []).forEach(s => {
+                        fBody.innerHTML += `
                             <tr>
                                 <td><strong>${s.carrier_code || 'AI'} ${s.flight_number || ''}</strong></td>
                                 <td>${s.segment_origin || '---'} ➔ ${s.segment_destination || '---'}</td>
@@ -282,33 +372,22 @@ def web_dashboard():
                             </tr>
                         `;
                     });
-                }
 
-                // Render Activity View (Events)
-                const aBody = document.getElementById('activityTableBody');
-                aBody.innerHTML = '';
-                if (!data.activity_view || data.activity_view.length === 0) {
-                    aBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b;">No activity logs recorded.</td></tr>';
-                } else {
-                    data.activity_view.forEach(ev => {
-                        const flightUld = [
-                            ev.flight_number ? `${ev.flight_carrier_code || 'AI'} ${ev.flight_number}` : '',
-                            ev.uld_number ? `ULD: ${ev.uld_number}` : ''
-                        ].filter(Boolean).join(' | ') || '---';
-
-                        const pcsWt = [
-                            ev.pieces !== null && ev.pieces !== undefined ? `${ev.pieces} pcs` : '',
-                            ev.weight !== null && ev.weight !== undefined ? `${ev.weight} ${ev.weight_unit}` : ''
-                        ].filter(Boolean).join(' / ') || '---';
-
-                        aBody.innerHTML += `
+                    // History
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.activity_view || []).forEach(ev => {
+                        const pcsWt = [ev.pieces !== null ? `${ev.pieces} pcs` : '', ev.weight !== null ? `${ev.weight} ${ev.weight_unit}` : ''].filter(Boolean).join(' / ') || '---';
+                        const flUld = [ev.flight_number ? `${ev.flight_carrier_code || 'AI'} ${ev.flight_number}` : '', ev.uld_number ? `ULD: ${ev.uld_number}` : ''].filter(Boolean).join(' | ') || '---';
+                        hBody.innerHTML += `
                             <tr>
                                 <td>${ev.event_time || ev.last_updated_time || '---'}</td>
-                                <td><span class="badge-event">${ev.event_code}</span></td>
+                                <td><span class="badge-ev">${ev.event_code}</span></td>
                                 <td>${ev.event_name}</td>
                                 <td>${ev.airport_code || '---'}</td>
                                 <td>${pcsWt}</td>
-                                <td>${flightUld}</td>
+                                <td>${flUld}</td>
+                                <td><span style="color: #16a34a; font-weight: 600;">Recorded</span></td>
                             </tr>
                         `;
                     });
@@ -324,21 +403,20 @@ def web_dashboard():
         }
 
         function switchTab(tab) {
-            const tabs = document.querySelectorAll('.tab-btn');
+            const tabs = document.querySelectorAll('.tab-item');
             tabs.forEach(t => t.classList.remove('active'));
 
-            if (tab === 'tracking') {
+            if (tab === 'flights') {
                 tabs[0].classList.add('active');
-                document.getElementById('tabTracking').style.display = 'block';
-                document.getElementById('tabActivity').style.display = 'none';
+                document.getElementById('panelFlights').style.display = 'block';
+                document.getElementById('panelHistory').style.display = 'none';
             } else {
                 tabs[1].classList.add('active');
-                document.getElementById('tabTracking').style.display = 'none';
-                document.getElementById('tabActivity').style.display = 'block';
+                document.getElementById('panelFlights').style.display = 'none';
+                document.getElementById('panelHistory').style.display = 'block';
             }
         }
 
-        // Auto track on load
         window.addEventListener('DOMContentLoaded', () => {
             trackAWB();
         });
@@ -346,7 +424,6 @@ def web_dashboard():
 </body>
 </html>
     """
-    return html_content
 
 
 if __name__ == "__main__":
