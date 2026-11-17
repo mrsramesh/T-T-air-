@@ -13,6 +13,7 @@ from emirates_tracker.client import EmiratesTrackerClient
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
+from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -24,6 +25,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.kw_client = KuwaitCargoClient()
         self.parcels_client = ParcelsTrackerClient()
         self.virgin_client = VirginCargoClient()
+        self.qatar_client = QatarCargoClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -180,6 +182,40 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(VirginShipmentNotFoundError) as ctx:
             self.virgin_client.track("932-99999999", headless=True)
         self.assertIn("Could not find AWB 932-99999999", str(ctx.exception))
+
+    def test_qatar_awb_normalization(self):
+        prefix, serial, formatted, portal_serial = self.qatar_client.normalize_awb("157-5366-1580")
+        self.assertEqual(prefix, "157")
+        self.assertEqual(serial, "53661580")
+        self.assertEqual(formatted, "157-53661580")
+        self.assertEqual(portal_serial, "53661580")
+
+        # 8-digit serial input (prefix 157 auto-inferred)
+        prefix, serial, formatted, portal_serial = self.qatar_client.normalize_awb("53661580")
+        self.assertEqual(prefix, "157")
+        self.assertEqual(serial, "53661580")
+        self.assertEqual(formatted, "157-53661580")
+        self.assertEqual(portal_serial, "53661580")
+
+    def test_live_qatar_tracking(self):
+        res = self.qatar_client.track("157-5366-1580", headless=True)
+        self.assertEqual(res.formatted_awb, "157-53661580")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "LUN")
+        self.assertEqual(res.overview.pieces, 2)
+        self.assertEqual(res.overview.weight, 1065.0)
+        self.assertEqual(res.overview.volume, 2.706)
+        self.assertEqual(res.overview.overall_status, "Delivered")
+        self.assertEqual(len(res.flights), 3)
+        self.assertEqual(res.flights[0].flight_number, "QR-0579")
+        self.assertEqual(len(res.milestones), 17)
+        self.assertEqual(res.milestones[0].status_code, "DLV")
+        self.assertTrue(res.milestones[0].is_latest)
+
+    def test_qatar_not_found_handling(self):
+        with self.assertRaises(QatarShipmentNotFoundError) as ctx:
+            self.qatar_client.track("157-99999999", headless=True)
+        self.assertIn("No result found", str(ctx.exception))
 
 
 if __name__ == "__main__":

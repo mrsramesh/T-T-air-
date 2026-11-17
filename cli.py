@@ -30,6 +30,7 @@ from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from kuwait_tracker.browser import KuwaitBrowserTracker
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
+from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 
 console = Console()
 
@@ -37,6 +38,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("157"):
+        return "qatar"
     if cleaned.startswith("932"):
         return "virgin"
     if cleaned.startswith("125"):
@@ -615,20 +618,116 @@ def render_virgin_milestones(milestones):
     console.print(table)
 
 
+# ==================== QATAR AIRWAYS RENDERING ====================
+
+def render_qatar_overview(overview):
+    """Render Qatar Airways summary overview card."""
+    status_color = "green" if "deliver" in overview.overall_status.lower() else ("yellow" if "arriv" in overview.overall_status.lower() else "cyan")
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold magenta", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold magenta", justify="right")
+    grid.add_column()
+
+    grid.add_row("AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+                 "Route:", f"[bold cyan]{overview.origin or 'N/A'} ➔ {overview.destination or 'N/A'}[/bold cyan]")
+    pcs_str = f"{overview.pieces} pcs" if overview.pieces else "N/A"
+    wt_str = f"{overview.weight:,.1f} {overview.weight_unit}" if overview.weight else "N/A"
+    vol_str = f"{overview.volume:.3f} {overview.volume_unit}" if overview.volume else "N/A"
+
+    grid.add_row("Pieces:", pcs_str,
+                 "Weight:", wt_str)
+    grid.add_row("Volume:", vol_str,
+                 "Latest Update:", f"[bold {status_color}]{overview.latest_status_message or overview.overall_status}[/bold {status_color}]")
+
+    if overview.latest_arrival_message:
+        grid.add_row("Arrival Info:", f"[dim white]{overview.latest_arrival_message}[/dim white]",
+                     "Overall Status:", f"[bold {status_color} on default] {overview.overall_status} [/bold {status_color} on default]")
+    else:
+        grid.add_row("Overall Status:", f"[bold {status_color} on default] {overview.overall_status} [/bold {status_color} on default]",
+                     "", "")
+
+    console.print(Panel(grid, title=f"[bold #5c0632]🇶🇦 {overview.airline}[/bold #5c0632] - [bold white]{overview.formatted_awb}[/bold white]", border_style="magenta", box=box.ROUNDED))
+
+
+def render_qatar_flights(flights):
+    """Render Qatar Airways flight segments."""
+    table = Table(title="[bold magenta]🛫 Qatar Airways Cargo - Flight Itinerary & Schedule (3 Legs)[/bold magenta]", box=box.ROUNDED)
+    table.add_column("Flight", style="bold #5c0632")
+    table.add_column("Route", style="cyan")
+    table.add_column("Departure Date/Time", style="white")
+    table.add_column("Arrival Date/Time", style="white")
+    table.add_column("Pieces / Weight", justify="right")
+    table.add_column("Volume", justify="right", style="dim white")
+    table.add_column("Flight Status", justify="center")
+
+    if not flights:
+        console.print("[dim yellow]No specific flight segment details available.[/dim yellow]")
+        return
+
+    for f in flights:
+        pcs_wt = f"{f.pieces or '---'} pcs / {f.weight or '---'} {f.weight_unit}"
+        vol = f"{f.volume:.3f} {f.volume_unit}" if f.volume else "---"
+        st_color = "green" if f.flight_status == "Departed" else ("yellow" if f.flight_status == "Scheduled" else "cyan")
+        table.add_row(
+            f.flight_number,
+            f"{f.origin} ➔ {f.destination}",
+            f.departure_date_time or "N/A",
+            f.arrival_date_time or "N/A",
+            pcs_wt,
+            vol,
+            f"[bold {st_color}]{f.flight_status}[/bold {st_color}]"
+        )
+
+    console.print(table)
+
+
+def render_qatar_milestones(milestones):
+    """Render Qatar Airways operational movement status milestones."""
+    table = Table(title="[bold cyan]📅 Qatar Airways Cargo - Tracking Details & Movement Milestones[/bold cyan]", box=box.ROUNDED)
+    table.add_column("Date", style="white", min_width=15)
+    table.add_column("Time", style="yellow", justify="center")
+    table.add_column("Code", style="bold magenta", justify="center")
+    table.add_column("Airport", style="bold cyan", justify="center")
+    table.add_column("Movement Details", style="white")
+    table.add_column("Pieces / Weight", style="dim white", justify="right")
+    table.add_column("State", justify="center")
+
+    if not milestones:
+        console.print("[dim yellow]No milestone events recorded.[/dim yellow]")
+        return
+
+    for m in milestones:
+        pcs_wt = f"{m.pieces} pcs / {m.weight} {m.weight_unit}" if m.pieces else "---"
+        state = "[bold green]LATEST[/bold green]" if m.is_latest else "[dim]Historical[/dim]"
+        table.add_row(
+            m.event_date or "N/A",
+            m.event_time or "N/A",
+            m.status_code,
+            m.airport or "---",
+            m.details,
+            pcs_wt,
+            state
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        help="One or more AWB numbers (e.g. '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "parcels"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157)",
     )
     parser.add_argument(
         "--view",
@@ -655,6 +754,7 @@ def main():
     kw_client = KuwaitCargoClient()
     parcels_client = ParcelsTrackerClient()
     virgin_client = VirginCargoClient()
+    qatar_client = QatarCargoClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -796,6 +896,26 @@ def main():
                         render_virgin_flights(res.flights)
                     if args.view in ("all", "activity"):
                         render_virgin_milestones(res.milestones)
+
+            elif carrier in ("qatar", "qrcargo"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]
+                screenshot = f"qatar_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold magenta]Tracking Qatar Airways Cargo {raw_awb} via Experience Cloud Portal...[/bold magenta]"):
+                    res = qatar_client.track(raw_awb, headless=True, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_qatar_overview(res.overview)
+                    if args.view in ("all", "tracking"):
+                        render_qatar_flights(res.flights)
+                    if args.view in ("all", "activity"):
+                        render_qatar_milestones(res.milestones)
 
             else:
                 # Default to Air India

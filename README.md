@@ -1,6 +1,7 @@
 # Multi-Carrier Air Cargo Tracking System (Production-Ready)
 
 An enterprise-grade, high-performance tracking solution supporting:
+- **Qatar Airways Cargo (`157`)** (`qrcargo.com/s/track-your-shipment` Experience Cloud LWC portal automation)
 - **Virgin Atlantic Cargo (`932`)** (`myvs.virginatlanticcargo.com` Accelya Offer & Order portal automation)
 - **British Airways Cargo (`125`)** (`parcelsapp.com` stealth Playwright automation with anti-bot bypass)
 - **Kuwait Airways (`229`)** (Direct REST APIs & live portal Playwright automation)
@@ -10,13 +11,33 @@ An enterprise-grade, high-performance tracking solution supporting:
 
 Built using dual architectures:
 1. **High-Speed Direct REST & GraphQL APIs** (Instant, sub-second responses, guest OAuth caching, zero bot-blocking).
-2. **Headless Browser Automation (Playwright)** (Automates cookie banners, form submission, anti-bot stealth WebGL spoofing, error detection, and full page visual screenshots).
+2. **Headless Browser Automation (Playwright)** (Automates cookie banners, form submission, Salesforce Aura Apex interception, anti-bot stealth WebGL spoofing, error detection, and full page visual screenshots).
 
 ---
 
 ## 🌟 Key Features
 
-### ✈ 1. Virgin Atlantic Cargo (`932`) via Accelya Offer & Order Portal
+### 🇶🇦 1. Qatar Airways Cargo (`157`) via Experience Cloud Portal
+- **Portal & Tracking Workflow**:
+  - Live portal: `https://www.qrcargo.com/s/track-your-shipment`.
+  - Automatically dismisses cookie consent banner if present (`input[value='Yes, got it.']`).
+  - Automatically removes prefix `157` and enters only the last 8-digit tracking number (e.g. `53661580` for `157-5366-1580`) in the `AWB Number(s)` input field (`input[data-id='docawb']`), preserving the portal's preset prefix `157`.
+  - Clicks **"Track Shipment(s)"** button and intercepts Salesforce Aura Apex action responses containing `cargoTrackingSOs`.
+  - Detects non-existent AWB gracefully with `"No result found for the given input"` error handling.
+- **Complete Extracted Details (e.g. `157-5366-1580`)**:
+  - **Route**: `DEL ➔ LUN` (Delhi, India to Lusaka, Zambia).
+  - **Metrics**: 2 pieces, 1,065.0 Kg gross weight, 2.706 m³ volume.
+  - **Overall & Live Status**: `Delivered`, `Delivered ( LUN)`, `Arrived ( LUN) 30-Jun-2026 14:27`.
+  - **3 Flight Legs**:
+    - `QR-0579`: DEL ➔ DOH (Dep: 28-Jun 03:25, Arr: 28-Jun 04:52, 2 pcs, 1065.0 Kg, 2.706 m³, Departed PAX).
+    - `QR-1455`: DOH ➔ LUN (Dep: 03-Jul 02:26, Arr: 03-Jul 09:45, 1 pcs, 532.5 Kg, 1.353 m³, Departed PAX).
+    - `QR-1451`: DOH ➔ LUN (Dep: 30-Jun 08:23, Arr: 30-Jun 14:27, 1 pcs, 532.5 Kg, 1.353 m³, Departed PAX).
+  - **17 Operational Movement Milestones**:
+    - Complete chronological milestone history from `RCS` (Received from shipper in DEL) to `DLV` (Delivered in LUN) with timestamps, airports, piece counts, and weights.
+
+---
+
+### ✈ 2. Virgin Atlantic Cargo (`932`) via Accelya Offer & Order Portal
 - **Portal & Tracking Workflow**:
   - Live portal: `https://myvs.virginatlanticcargo.com/app/offerandorder/#/shipments/list`.
   - Enters full 11-digit AWB number (e.g. `93278989514`) into the `Doc. No. e.g.: 93202268011` placeholder input field as a single unified token.
@@ -33,7 +54,9 @@ Built using dual architectures:
     - `VS 0045`: LHR ➔ JFK (Dep: 24 Nov 11:35, Arr: 24 Nov 14:55, 4 pcs / 1780 K).
   - **Operational Milestones**: `BKD` (Booked on Flight VS-0045 & VS-0303) at DEL.
 
-### ✈ 2. British Airways Cargo (`125`) via ParcelsApp Automation
+---
+
+### ✈ 3. British Airways Cargo (`125`) via ParcelsApp Automation
 - **ParcelsApp Tracking Workflow**:
   - Live portal: `https://parcelsapp.com/en/tracking`.
   - Enters 11-digit AWB number (e.g. `125-24128344`) in the placeholder input field.
@@ -49,7 +72,9 @@ Built using dual architectures:
   - **Latest Status**: `Received on flight. Flight BA223 @ Nashville Intl (BNA), Nashville, United States`.
   - **18 Chronological Milestone & Flight Events** (LHR, BNA, ATL, DEL) including departures, arrivals, bookings, and discrepancy updates.
 
-### ✈ 2. Kuwait Airways Cargo (`229`)
+---
+
+### ✈ 4. Kuwait Airways Cargo (`229`)
 - **Portal & API Integration**:
   - Live portal: `https://www.kuwaitairways.com/en/cargo/tracking`.
   - High-speed direct REST API: `https://services.kuwaitairways.com/cargo/api/GetCargoInfo/229/{serial}/en`.
@@ -65,7 +90,9 @@ Built using dual architectures:
   - Flight segments (`KU304` BOM ➔ KWI, `KU101` KWI ➔ LHR).
   - Chronological Operational Status Events (`DLV`, `NFD`, `RCF`, `ARR`, `DEP`, `MAN`, `PRE`, `RCS`).
 
-### ✈ 2. Emirates SkyCargo (`176`) via track-trace.com & Direct REST
+---
+
+### ✈ 5. Emirates SkyCargo (`176`) via track-trace.com & Direct REST
 - **track-trace.com Automation**:
   - Navigates to `https://www.track-trace.com/aircargo`.
   - Enters AWB in `Enter number...` input field.
@@ -76,12 +103,16 @@ Built using dual architectures:
   - Thread-safe guest OAuth token negotiation (`api/uaa/guest/oauth/token`).
   - Multi-booking order discovery and milestone details.
 
-### ✈ 3. Lufthansa Cargo (`020`)
+---
+
+### ✈ 6. Lufthansa Cargo (`020`)
 - **AWB Sanitization**: Automatically handles `020-04585280` or `04585280`.
 - **Cookie Consent**: Automatically detects and dismisses the "Cookie Settings" popup by clicking **"Deny"**.
 - **Complete AWB Details**: Flight segments, milestones, acceptance times, and status audit trail.
 
-### ✈ 4. Air India Cargo (`098`)
+---
+
+### ✈ 7. Air India Cargo (`098`)
 - IBS Software **iCargo Neo** GraphQL integration with anonymous session management.
 - Tracking View and Activity View with ULD container numbers.
 
@@ -98,6 +129,15 @@ playwright install chromium
 ---
 
 ### 2. Command-Line Interface (CLI)
+
+#### Track Qatar Airways Cargo AWB (via Experience Cloud Portal):
+```bash
+# Auto-detect carrier by prefix 157
+python3 cli.py 157-5366-1580
+
+# Capture full page visual screenshot
+python3 cli.py 157-5366-1580 --browser
+```
 
 #### Track Virgin Atlantic Cargo AWB (via Accelya Portal):
 ```bash
@@ -159,12 +199,12 @@ python3 server.py
 ```
 
 - **Interactive Web Dashboard**: Open `http://localhost:8000/` in your browser.
-  - Quick-sample buttons for Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
+  - Quick-sample buttons for Qatar Airways (`157-5366-1580`), Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
   - Real-time status pills, route map overview, package weights, flight legs, and timeline milestone events.
 - **REST API Endpoints**:
-  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `932`, `125`, `229`, `176`, `020`, or `098`)
+  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `157`, `932`, `125`, `229`, `176`, `020`, or `098`)
   - `POST /api/v1/track/batch` (Batch track multiple AWBs across carriers)
-  - `GET /health` (System health and carrier coverage for all 6 airlines)
+  - `GET /health` (System health and carrier coverage for all 7 airlines)
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
 
 ---

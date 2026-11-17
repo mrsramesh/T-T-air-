@@ -25,11 +25,12 @@ from emirates_tracker.client import EmiratesTrackerClient, EmiratesShipmentNotFo
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError, KuwaitTrackingError
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError, ParcelsTrackingError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError, VirginTrackingError
+from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError, QatarTrackingError
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
-    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), Kuwait Airways (229), British Airways Cargo (125), and Virgin Atlantic Cargo (932).",
-    version="6.0.0",
+    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), Kuwait Airways (229), British Airways Cargo (125), Virgin Atlantic Cargo (932), and Qatar Airways Cargo (157).",
+    version="7.0.0",
 )
 
 app.add_middleware(
@@ -46,6 +47,7 @@ ek_client = EmiratesTrackerClient()
 kw_client = KuwaitCargoClient()
 parcels_client = ParcelsTrackerClient()
 virgin_client = VirginCargoClient()
+qatar_client = QatarCargoClient()
 
 
 class BatchTrackRequest(BaseModel):
@@ -55,6 +57,8 @@ class BatchTrackRequest(BaseModel):
 
 def detect_carrier(awb: str) -> str:
     cleaned = re.sub(r"[\s\-_]+", "", awb.strip())
+    if cleaned.startswith("157"):
+        return "qatar"
     if cleaned.startswith("932"):
         return "virgin"
     if cleaned.startswith("125"):
@@ -84,6 +88,7 @@ def health_check():
             "Kuwait Airways (229)",
             "British Airways Cargo (125)",
             "Virgin Atlantic Cargo (932)",
+            "Qatar Airways Cargo (157)",
         ],
     }
 
@@ -91,16 +96,19 @@ def health_check():
 @app.get("/api/v1/track/{awb}", tags=["Tracking"])
 def track_shipment(
     awb: str,
-    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', 'kuwait', 'britishairways', or 'virgin'"),
+    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', 'kuwait', 'britishairways', 'virgin', or 'qatar'"),
 ):
     """
     Track a shipment by AWB number.
-    Auto-detects Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
+    Auto-detects Qatar Airways (157), Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
     """
-    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "parcels") else detect_carrier(awb)
+    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "parcels") else detect_carrier(awb)
 
     try:
-        if target_carrier in ("virgin", "virginatlantic"):
+        if target_carrier in ("qatar", "qrcargo"):
+            res = qatar_client.track(awb)
+            return {"carrier": "Qatar Airways Cargo", "carrier_code": "157", "data": res.dict()}
+        elif target_carrier in ("virgin", "virginatlantic"):
             res = virgin_client.track(awb)
             return {"carrier": "Virgin Atlantic Cargo", "carrier_code": "932", "data": res.dict()}
         elif target_carrier in ("britishairways", "parcels"):
@@ -118,9 +126,9 @@ def track_shipment(
         else:
             res = ai_client.track(awb)
             return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.dict()}
-    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, ValueError) as e:
+    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, QatarShipmentNotFoundError, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError) as e:
+    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError, QatarTrackingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
@@ -131,9 +139,11 @@ def track_batch(payload: BatchTrackRequest):
     """Track multiple AWBs concurrently across multiple carriers."""
     results = {}
     for awb in payload.awbs:
-        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "parcels") else detect_carrier(awb)
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "parcels") else detect_carrier(awb)
         try:
-            if target in ("virgin", "virginatlantic"):
+            if target in ("qatar", "qrcargo"):
+                results[awb] = {"carrier": "Qatar Airways Cargo", "status": "success", "data": qatar_client.track(awb).dict()}
+            elif target in ("virgin", "virginatlantic"):
                 results[awb] = {"carrier": "Virgin Atlantic Cargo", "status": "success", "data": virgin_client.track(awb).dict()}
             elif target in ("britishairways", "parcels"):
                 results[awb] = {"carrier": "British Airways Cargo", "status": "success", "data": parcels_client.track(awb).dict()}
@@ -181,6 +191,7 @@ def web_dashboard():
         .container { max-width: 1080px; margin: 0 auto; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
         .logo-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .badge-qr { background: #5c0632; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #8a0c4d; }
         .badge-vs { background: #e10a0a; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #7c0404; }
         .badge-ba { background: #00205b; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #eb2226; }
         .badge-kw { background: var(--primary-kw); color: #bae6fd; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #0284c7; }
@@ -229,6 +240,7 @@ def web_dashboard():
     <div class="container">
         <div class="header">
             <div class="logo-wrap">
+                <span class="badge-qr">QATAR AIRWAYS (157)</span>
                 <span class="badge-vs">VIRGIN ATLANTIC (932)</span>
                 <span class="badge-ba">BRITISH AIRWAYS (125)</span>
                 <span class="badge-kw">KUWAIT (229)</span>
@@ -244,6 +256,7 @@ def web_dashboard():
             <div class="form-row">
                 <select id="carrierSelect" class="carrier-select">
                     <option value="auto">Auto-Detect Carrier</option>
+                    <option value="qatar">Qatar Airways Cargo (157)</option>
                     <option value="virgin">Virgin Atlantic Cargo (932)</option>
                     <option value="britishairways">British Airways Cargo (125)</option>
                     <option value="kuwait">Kuwait Airways (229)</option>
@@ -251,11 +264,12 @@ def web_dashboard():
                     <option value="lufthansa">Lufthansa Cargo (020)</option>
                     <option value="airindia">Air India Cargo (098)</option>
                 </select>
-                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 932-78989514, 125-24128344, 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="932-78989514" />
+                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 157-5366-1580, 932-78989514, 125-24128344, 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="157-5366-1580" />
                 <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
             </div>
             <div class="quick-links">
                 <span>Quick Samples:</span>
+                <button class="quick-btn" onclick="setAwb('157-5366-1580', 'qatar')">157-5366-1580 (Qatar Airways)</button>
                 <button class="quick-btn" onclick="setAwb('932-78989514', 'virgin')">932-78989514 (Virgin Atlantic)</button>
                 <button class="quick-btn" onclick="setAwb('125-24128344', 'britishairways')">125-24128344 (British Airways)</button>
                 <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Valid)</button>
@@ -381,7 +395,58 @@ def web_dashboard():
 
                 const topBar = document.getElementById('cardTop');
 
-                if (cName.includes('Virgin')) {
+                if (cName.includes('Qatar')) {
+                    // Qatar Airways Cargo
+                    topBar.style.background = '#fdf2f8';
+                    document.getElementById('statusPill').style.background = '#5c0632';
+                    document.getElementById('statusPill').style.color = '#ffffff';
+                    document.getElementById('statusPill').innerText = data.overview.overall_status || 'DELIVERED';
+
+                    const st1 = data.overview.latest_status_message ? ` &bull; <em>${data.overview.latest_status_message}</em>` : '';
+                    const st2 = data.overview.latest_arrival_message ? ` &bull; <em>${data.overview.latest_arrival_message}</em>` : '';
+                    document.getElementById('latestBanner').innerHTML = `<strong>Qatar Airways Cargo:</strong> ${data.overview.overall_status}${st1}${st2}`;
+
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin || 'DEL'} ➔ ${data.overview.destination || 'LUN'}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces || '---'} pcs / ${data.overview.weight || '---'} ${data.overview.weight_unit || 'Kg'}`;
+                    document.getElementById('volumeDisplay').innerText = `${data.overview.volume || '---'} ${data.overview.volume_unit || 'm³'}`;
+                    document.getElementById('productDisplay').innerText = `${data.overview.overall_status} (${data.overview.latest_status_message || ''})`;
+
+                    // Flights
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flights || []).forEach(fl => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color: #5c0632;">${fl.flight_number}</strong></td>
+                                <td>${fl.origin} ➔ ${fl.destination}</td>
+                                <td>${fl.departure_date_time || 'N/A'}</td>
+                                <td>${fl.arrival_date_time || 'N/A'}</td>
+                                <td>${fl.pieces || '---'} pcs / ${fl.weight || '---'} ${fl.weight_unit || 'Kg'}</td>
+                                <td><span class="badge-ev">${fl.flight_status || 'Departed'}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Milestones
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.milestones || []).forEach(m => {
+                        const pcsWt = m.pieces ? `${m.pieces} pcs / ${m.weight} ${m.weight_unit || 'Kg'}` : '---';
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Historical</span>';
+                        const dt = [m.event_date, m.event_time].filter(Boolean).join(' ') || 'N/A';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${dt}</td>
+                                <td><span class="badge-ev">${m.status_code}</span></td>
+                                <td>${m.details}</td>
+                                <td><strong>${m.airport || '---'}</strong></td>
+                                <td>${pcsWt}</td>
+                                <td>${badge}</td>
+                            </tr>
+                        `;
+                    });
+
+                } else if (cName.includes('Virgin')) {
                     // Virgin Atlantic Cargo
                     topBar.style.background = '#fff1f2';
                     document.getElementById('statusPill').style.background = '#e10a0a';
