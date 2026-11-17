@@ -28,6 +28,7 @@ from emirates_tracker.client import EmiratesTrackerClient
 from emirates_tracker.browser import EmiratesBrowserTracker
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from kuwait_tracker.browser import KuwaitBrowserTracker
+from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 
 console = Console()
 
@@ -35,6 +36,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("125"):
+        return "britishairways"
     if cleaned.startswith("229"):
         return "kuwait"
     if cleaned.startswith("176"):
@@ -439,20 +442,91 @@ def render_kuwait_events(events):
     console.print(table)
 
 
+# ==================== BRITISH AIRWAYS & PARCELS RENDERING ====================
+
+def render_parcels_overview(overview, couriers=None):
+    """Render ParcelsApp & British Airways summary overview card."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+
+    grid.add_row(
+        "AWB / Tracking:", f"[bold white]{overview.formatted_tracking_number}[/bold white]",
+        "Route:", f"[bold magenta]{overview.origin_location or overview.origin_country or 'DEL'} ➔ {overview.destination_location or overview.destination_country or 'ATL'}[/bold magenta]"
+    )
+    grid.add_row(
+        "Pieces / Packages:", f"{overview.pieces or overview.number_of_packages or 'N/A'} pcs",
+        "Weight:", f"[bold white]{overview.weight or 'N/A'}[/bold white]"
+    )
+    grid.add_row(
+        "Days in Transit:", f"{overview.days_in_transit or 'N/A'} days",
+        "Carriers:", f"{', '.join(overview.couriers) if overview.couriers else overview.primary_carrier}"
+    )
+    grid.add_row(
+        "Latest Date:", f"{overview.latest_date or 'N/A'}",
+        "Latest Status:", f"[bold green on default] {overview.latest_status} [/bold green on default]"
+    )
+
+    console.print(Panel(grid, title=f"[bold blue]✈ {overview.primary_carrier}[/bold blue] - [bold white]{overview.formatted_tracking_number}[/bold white]", border_style="blue", box=box.ROUNDED))
+
+
+def render_parcels_timeline(states):
+    """Render ParcelsApp chronological event milestone timeline."""
+    table = Table(title="[bold yellow]📅 Event & Flight Timeline (British Airways Cargo / ParcelsApp)[/bold yellow]", box=box.ROUNDED)
+    table.add_column("Date & Time", style="white", min_width=18)
+    table.add_column("Carrier", style="bold cyan")
+    table.add_column("Status & Flight Event", style="white")
+    table.add_column("Location / Airport", style="bold magenta")
+    table.add_column("State", justify="center")
+
+    if not states:
+        console.print("[dim yellow]No timeline events recorded.[/dim yellow]")
+        return
+
+    for st in states:
+        badge = "[bold green]LATEST[/bold green]" if st.is_latest else "[dim]Completed[/dim]"
+        carrier_badge = f"[cyan]{st.carrier_name or 'BA Cargo'}[/cyan]"
+        table.add_row(
+            st.date or "N/A",
+            carrier_badge,
+            st.status,
+            st.location or "N/A",
+            badge,
+        )
+
+    console.print(table)
+
+
+def render_parcels_attributes(attributes):
+    """Render parsed attributes."""
+    if not attributes:
+        return
+    table = Table(title="[bold cyan]📋 Shipment Attributes[/bold cyan]", box=box.SIMPLE_HEAVY)
+    table.add_column("Attribute", style="bold white")
+    table.add_column("Value", style="yellow")
+
+    for attr in attributes:
+        table.add_row(attr.name or attr.key, attr.value)
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '098-30244056' Air India, '020-04585280' Lufthansa, '176-63116340' Emirates, '229-18148900' Kuwait Airways)",
+        help="One or more AWB numbers (e.g. '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125)",
     )
     parser.add_argument(
         "--view",
@@ -477,6 +551,7 @@ def main():
     ai_client = AirIndiaCargoClient()
     ek_client = EmiratesTrackerClient()
     kw_client = KuwaitCargoClient()
+    parcels_client = ParcelsTrackerClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -579,6 +654,25 @@ def main():
                         render_lufthansa_flights(res.flights)
                     if args.view in ("all", "activity"):
                         render_lufthansa_history(res.status_history)
+
+            elif carrier in ("britishairways", "parcels"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)
+                screenshot = f"parcels_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold cyan]Tracking British Airways Cargo / ParcelsApp {raw_awb}...[/bold cyan]"):
+                    res = parcels_client.track(raw_awb, headless=True, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_parcels_overview(res.overview, res.couriers)
+                    if args.view in ("all", "tracking", "activity"):
+                        render_parcels_timeline(res.states)
+                        render_parcels_attributes(res.attributes)
 
             else:
                 # Default to Air India

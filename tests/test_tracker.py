@@ -11,6 +11,7 @@ from airindia_tracker.client import AirIndiaCargoClient
 from lufthansa_tracker.client import LufthansaCargoClient
 from emirates_tracker.client import EmiratesTrackerClient
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
+from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -20,6 +21,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.lh_client = LufthansaCargoClient()
         self.ek_client = EmiratesTrackerClient()
         self.kw_client = KuwaitCargoClient()
+        self.parcels_client = ParcelsTrackerClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -116,6 +118,31 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(KuwaitShipmentNotFoundError) as ctx:
             self.kw_client.track("229-17349566")
         self.assertIn("Could not find AWB 229-17349566", str(ctx.exception))
+
+    def test_parcels_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.parcels_client.normalize_tracking_number("125-24128344")
+        self.assertEqual(prefix, "125")
+        self.assertEqual(serial, "24128344")
+        self.assertEqual(formatted, "125-24128344")
+        self.assertEqual(full_digits, "12524128344")
+
+        # Serial only
+        prefix, serial, formatted, full_digits = self.parcels_client.normalize_tracking_number("24128344")
+        self.assertEqual(prefix, "125")
+        self.assertEqual(serial, "24128344")
+        self.assertEqual(formatted, "125-24128344")
+        self.assertEqual(full_digits, "12524128344")
+
+    def test_live_parcels_british_airways_tracking(self):
+        res = self.parcels_client.track("125-24128344", headless=True)
+        self.assertEqual(res.formatted_tracking_number, "125-24128344")
+        self.assertIn("British Airways", res.overview.primary_carrier)
+        self.assertIn("DEL", res.overview.origin_location or "")
+        self.assertIn("ATL", res.overview.destination_location or "")
+        self.assertEqual(res.overview.number_of_packages, "65")
+        self.assertIn("1103", res.overview.weight or "")
+        self.assertGreaterEqual(len(res.states), 15)
+        self.assertGreaterEqual(len(res.couriers), 1)
 
 
 if __name__ == "__main__":
