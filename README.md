@@ -1,6 +1,7 @@
 # Multi-Carrier Air Cargo Tracking System (Production-Ready)
 
 An enterprise-grade, high-performance tracking solution supporting:
+- **Virgin Atlantic Cargo (`932`)** (`myvs.virginatlanticcargo.com` Accelya Offer & Order portal automation)
 - **British Airways Cargo (`125`)** (`parcelsapp.com` stealth Playwright automation with anti-bot bypass)
 - **Kuwait Airways (`229`)** (Direct REST APIs & live portal Playwright automation)
 - **Emirates SkyCargo (`176`)** (Direct REST APIs & `track-trace.com` headless automation)
@@ -15,7 +16,24 @@ Built using dual architectures:
 
 ## 🌟 Key Features
 
-### ✈ 1. British Airways Cargo (`125`) via ParcelsApp Automation
+### ✈ 1. Virgin Atlantic Cargo (`932`) via Accelya Offer & Order Portal
+- **Portal & Tracking Workflow**:
+  - Live portal: `https://myvs.virginatlanticcargo.com/app/offerandorder/#/shipments/list`.
+  - Enters full 11-digit AWB number (e.g. `93278989514`) into the `Doc. No. e.g.: 93202268011` placeholder input field as a single unified token.
+  - Corrects the tag-split issue where spaces or hyphens create disjointed chips (`932` and `78989514`), ensuring 100% submission validity.
+  - Clicks **"Search"** button, then clicks **"Tracking Details"** to transition to full shipment order view.
+- **Complete Extracted Details (e.g. `932-78989514`)**:
+  - **Route**: `DELHI (DEL) ➔ NEW YORK CITY (JFK)`.
+  - **Job Reference (JRN)**: `6532966` | **Booking Ref**: `7598319`.
+  - **Metrics**: 4 pieces, 1,780.0 K gross weight, 3.95 CM volume.
+  - **Order & Movement Status**: `Your order is confirmed` | `Shipment is not ready for Movement`.
+  - **Transit Duration**: `68 Hour(s) 30 Minute(s) (1 Stop)` via London Heathrow (LHR).
+  - **Confirmed Flight Legs**:
+    - `VS 0303`: DEL ➔ LHR (Dep: 22 Nov 04:55, Arr: 22 Nov 09:30, 4 pcs / 1780 K).
+    - `VS 0045`: LHR ➔ JFK (Dep: 24 Nov 11:35, Arr: 24 Nov 14:55, 4 pcs / 1780 K).
+  - **Operational Milestones**: `BKD` (Booked on Flight VS-0045 & VS-0303) at DEL.
+
+### ✈ 2. British Airways Cargo (`125`) via ParcelsApp Automation
 - **ParcelsApp Tracking Workflow**:
   - Live portal: `https://parcelsapp.com/en/tracking`.
   - Enters 11-digit AWB number (e.g. `125-24128344`) in the placeholder input field.
@@ -81,6 +99,15 @@ playwright install chromium
 
 ### 2. Command-Line Interface (CLI)
 
+#### Track Virgin Atlantic Cargo AWB (via Accelya Portal):
+```bash
+# Auto-detect carrier by prefix 932
+python3 cli.py 932-78989514
+
+# Capture full page visual screenshot
+python3 cli.py 932-78989514 --browser
+```
+
 #### Track British Airways Cargo AWB (via ParcelsApp):
 ```bash
 # Auto-detect carrier by prefix 125
@@ -132,12 +159,12 @@ python3 server.py
 ```
 
 - **Interactive Web Dashboard**: Open `http://localhost:8000/` in your browser.
-  - Quick-sample buttons for British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
+  - Quick-sample buttons for Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
   - Real-time status pills, route map overview, package weights, flight legs, and timeline milestone events.
 - **REST API Endpoints**:
-  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `125`, `229`, `176`, `020`, or `098`)
+  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `932`, `125`, `229`, `176`, `020`, or `098`)
   - `POST /api/v1/track/batch` (Batch track multiple AWBs across carriers)
-  - `GET /health` (System health and carrier coverage for all 5 airlines)
+  - `GET /health` (System health and carrier coverage for all 6 airlines)
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
 
 ---

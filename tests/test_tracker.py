@@ -12,6 +12,7 @@ from lufthansa_tracker.client import LufthansaCargoClient
 from emirates_tracker.client import EmiratesTrackerClient
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
+from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -22,6 +23,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.ek_client = EmiratesTrackerClient()
         self.kw_client = KuwaitCargoClient()
         self.parcels_client = ParcelsTrackerClient()
+        self.virgin_client = VirginCargoClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -143,6 +145,41 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertIn("1103", res.overview.weight or "")
         self.assertGreaterEqual(len(res.states), 15)
         self.assertGreaterEqual(len(res.couriers), 1)
+
+    def test_virgin_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.virgin_client.normalize_awb("932-78989514")
+        self.assertEqual(prefix, "932")
+        self.assertEqual(serial, "78989514")
+        self.assertEqual(formatted, "932-78989514")
+        self.assertEqual(full_digits, "93278989514")
+
+        # 8-digit input (auto-prefix 932)
+        prefix, serial, formatted, full_digits = self.virgin_client.normalize_awb("78989514")
+        self.assertEqual(prefix, "932")
+        self.assertEqual(serial, "78989514")
+        self.assertEqual(formatted, "932-78989514")
+        self.assertEqual(full_digits, "93278989514")
+
+    def test_live_virgin_tracking(self):
+        res = self.virgin_client.track("932-78989514", headless=True)
+        self.assertEqual(res.formatted_awb, "932-78989514")
+        self.assertEqual(res.overview.origin.code, "DEL")
+        self.assertEqual(res.overview.destination.code, "JFK")
+        self.assertEqual(res.overview.pieces, 4)
+        self.assertEqual(res.overview.weight, 1780.0)
+        self.assertEqual(res.overview.weight_unit, "K")
+        self.assertIn("confirmed", res.overview.order_status.lower())
+        self.assertEqual(res.overview.job_reference_number, "6532966")
+        self.assertEqual(res.overview.booking_reference_number, "7598319")
+        self.assertEqual(len(res.flights), 2)
+        self.assertEqual(res.flights[0].flight_number, "VS 0303")
+        self.assertEqual(res.flights[1].flight_number, "VS 0045")
+        self.assertGreaterEqual(len(res.milestones), 2)
+
+    def test_virgin_not_found_handling(self):
+        with self.assertRaises(VirginShipmentNotFoundError) as ctx:
+            self.virgin_client.track("932-99999999", headless=True)
+        self.assertIn("Could not find AWB 932-99999999", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ from emirates_tracker.browser import EmiratesBrowserTracker
 from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from kuwait_tracker.browser import KuwaitBrowserTracker
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
+from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 
 console = Console()
 
@@ -36,6 +37,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("932"):
+        return "virgin"
     if cleaned.startswith("125"):
         return "britishairways"
     if cleaned.startswith("229"):
@@ -513,20 +516,119 @@ def render_parcels_attributes(attributes):
     console.print(table)
 
 
+# ==================== VIRGIN ATLANTIC RENDERING ====================
+
+def render_virgin_overview(overview):
+    """Render Virgin Atlantic summary overview card."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold magenta", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold magenta", justify="right")
+    grid.add_column()
+
+    grid.add_row(
+        "AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+        "Route:", f"[bold red]{overview.origin.code} ({overview.origin.name or ''}) ➔ {overview.destination.code} ({overview.destination.name or ''})[/bold red]"
+    )
+    grid.add_row(
+        "Job Ref (JRN):", f"[bold cyan]{overview.job_reference_number or 'N/A'}[/bold cyan]",
+        "Booking Ref:", f"[bold cyan]{overview.booking_reference_number or 'N/A'}[/bold cyan]"
+    )
+    grid.add_row(
+        "Pieces / Weight:", f"{overview.pieces or 'N/A'} pcs / {overview.weight or 'N/A'} {overview.weight_unit}",
+        "Volume:", f"{overview.volume or 'N/A'} {overview.volume_unit}"
+    )
+    grid.add_row(
+        "Product / Commodity:", f"{overview.product_name or overview.commodity or 'General - Classic'}",
+        "Transit Time:", f"{overview.transit_duration or 'N/A'}"
+    )
+    grid.add_row(
+        "Agent / Shipper:", f"{overview.agent_name or 'N/A'}",
+        "Shipment Status:", f"[bold yellow]{overview.shipment_status or 'N/A'}[/bold yellow]"
+    )
+    grid.add_row(
+        "Order Status:", f"[bold green on default] {overview.order_status} [/bold green on default]",
+        "Latest Event:", f"[bold cyan]{overview.latest_milestone_code or 'BKD'}[/bold cyan] ({overview.latest_milestone_description or 'N/A'})"
+    )
+
+    console.print(Panel(grid, title=f"[bold red]✈ Virgin Atlantic Cargo[/bold red] - [bold white]{overview.formatted_awb}[/bold white]", border_style="red", box=box.ROUNDED))
+
+
+def render_virgin_flights(flights):
+    """Render Virgin Atlantic flight routing schedule."""
+    table = Table(title="[bold yellow]🛫 Virgin Atlantic - Flight Routing & Connections[/bold yellow]", box=box.ROUNDED)
+    table.add_column("Flight", style="bold red")
+    table.add_column("Route", style="magenta")
+    table.add_column("Scheduled Departure", style="white")
+    table.add_column("Scheduled Arrival", style="white")
+    table.add_column("Pieces / Weight", justify="right")
+    table.add_column("Status", justify="center")
+
+    if not flights:
+        console.print("[dim yellow]No specific flight segment details available.[/dim yellow]")
+        return
+
+    for f in flights:
+        pcs_wt = f"{f.pieces or '---'} pcs / {f.weight or '---'} {f.weight_unit or 'K'}"
+        table.add_row(
+            f.flight_number,
+            f"{f.origin.code} ➔ {f.destination.code}",
+            f.departure_time or "N/A",
+            f.arrival_time or "N/A",
+            pcs_wt,
+            f"[bold green]{f.status}[/bold green]"
+        )
+
+    console.print(table)
+
+
+def render_virgin_milestones(milestones):
+    """Render Virgin Atlantic operational milestone events."""
+    table = Table(title="[bold cyan]📅 Virgin Atlantic - Operational Milestones & Tracking Details[/bold cyan]", box=box.ROUNDED)
+    table.add_column("Date & Time", style="white", min_width=18)
+    table.add_column("Code", style="bold magenta", justify="center")
+    table.add_column("Station", style="bold cyan", justify="center")
+    table.add_column("Milestone Description", style="white")
+    table.add_column("Flight / Sector", style="yellow")
+    table.add_column("Pieces / Wt", style="dim white")
+    table.add_column("State", justify="center")
+
+    if not milestones:
+        console.print("[dim yellow]No milestone events recorded.[/dim yellow]")
+        return
+
+    for m in milestones:
+        sector = f"{m.board_point} ➔ {m.off_point}" if m.board_point and m.off_point else "---"
+        fl_sector = f"{m.flight_number} ({sector})" if m.flight_number else sector
+        pcs_wt = f"{m.pieces} pcs / {m.weight} {m.weight_unit}" if m.pieces else "---"
+        state = "[bold green]LATEST[/bold green]" if m.is_latest else "[dim]Planned[/dim]"
+        table.add_row(
+            m.timestamp or "N/A",
+            m.code,
+            m.station or "---",
+            m.description,
+            fl_sector,
+            pcs_wt,
+            state
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        help="One or more AWB numbers (e.g. '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "parcels"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932)",
     )
     parser.add_argument(
         "--view",
@@ -552,6 +654,7 @@ def main():
     ek_client = EmiratesTrackerClient()
     kw_client = KuwaitCargoClient()
     parcels_client = ParcelsTrackerClient()
+    virgin_client = VirginCargoClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -673,6 +776,26 @@ def main():
                     if args.view in ("all", "tracking", "activity"):
                         render_parcels_timeline(res.states)
                         render_parcels_attributes(res.attributes)
+
+            elif carrier in ("virgin", "virginatlantic"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)
+                screenshot = f"virgin_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold red]Tracking Virgin Atlantic Cargo {raw_awb} via Accelya Portal...[/bold red]"):
+                    res = virgin_client.track(raw_awb, headless=True, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_virgin_overview(res.overview)
+                    if args.view in ("all", "tracking"):
+                        render_virgin_flights(res.flights)
+                    if args.view in ("all", "activity"):
+                        render_virgin_milestones(res.milestones)
 
             else:
                 # Default to Air India
