@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Multi-Carrier Cargo Tracking CLI (Air India, Lufthansa Cargo & Emirates SkyCargo).
+Multi-Carrier Cargo Tracking CLI (Air India, Lufthansa Cargo, Emirates SkyCargo & Kuwait Airways).
 Provides rich, interactive command-line tracking across major airlines.
 """
 
@@ -26,6 +26,8 @@ from lufthansa_tracker.client import LufthansaCargoClient
 from lufthansa_tracker.browser import LufthansaBrowserTracker
 from emirates_tracker.client import EmiratesTrackerClient
 from emirates_tracker.browser import EmiratesBrowserTracker
+from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
+from kuwait_tracker.browser import KuwaitBrowserTracker
 
 console = Console()
 
@@ -33,6 +35,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("229"):
+        return "kuwait"
     if cleaned.startswith("176"):
         return "emirates"
     if cleaned.startswith("020"):
@@ -259,7 +263,6 @@ def render_emirates_overview(overview):
         box=box.ROUNDED
     ))
 
-    # Banner for latest milestone
     ms_banner = (
         f"[bold cyan]Latest Milestone:[/bold cyan] [bold white]{overview.latest_milestone_code}[/bold white] - "
         f"{overview.latest_milestone_description} "
@@ -341,20 +344,115 @@ def render_emirates_milestones(milestones):
     console.print(table)
 
 
+# ==================== KUWAIT AIRWAYS RENDERING ====================
+
+def render_kuwait_overview(overview, station_boxes):
+    """Render Kuwait Airways summary overview card & station transit cards."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold blue", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold blue", justify="right")
+    grid.add_column()
+
+    grid.add_row(
+        "AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+        "Route:", f"[bold cyan]{overview.origin} ➔ {overview.destination}[/bold cyan]"
+    )
+    grid.add_row(
+        "Pieces:", f"{overview.pieces} pcs",
+        "Gross Weight:", f"{overview.gross_weight:,.1f} {overview.weight_unit}"
+    )
+    grid.add_row(
+        "Volume:", f"{overview.volume:.2f} {overview.volume_unit}",
+        "Current Status:", f"[bold green]{overview.current_status}[/bold green]"
+    )
+
+    console.print(Panel(
+        grid,
+        title=f"[bold blue]✈ Kuwait Airways Cargo[/bold blue] - [bold white]{overview.formatted_awb}[/bold white]",
+        border_style="blue",
+        box=box.ROUNDED
+    ))
+
+    # Station boxes cards
+    if station_boxes:
+        box_table = Table(title="[bold cyan]📍 Transit Station Checkpoints (Routing Boxes)[/bold cyan]", box=box.ROUNDED)
+        box_table.add_column("Station", style="bold yellow", justify="center")
+        box_table.add_column("Check-in / Intake (Event 1)", style="white")
+        box_table.add_column("Departure / Delivery (Event 2)", style="white")
+        box_table.add_column("Pieces & Weight", justify="right")
+
+        for b in station_boxes:
+            ev1 = f"[bold cyan]{b.status_code_1 or '---'}[/bold cyan]: {b.event_time_1 or 'N/A'}"
+            ev2 = f"[bold green]{b.status_code_2 or '---'}[/bold green]: {b.event_time_2 or 'N/A'}"
+            pcs_wt = f"{b.pieces or '---'} pcs / {b.weight or '---'} KGS"
+            box_table.add_row(f"🏛 {b.airport}", ev1, ev2, pcs_wt)
+
+        console.print(box_table)
+
+
+def render_kuwait_flights(flights):
+    """Render Kuwait Airways flight legs & routing table."""
+    table = Table(title="[bold blue]🛫 Kuwait Airways - Flight Movements & Routing[/bold blue]", box=box.ROUNDED)
+    table.add_column("Flight", style="bold cyan")
+    table.add_column("Date", style="white")
+    table.add_column("Origin ➔ Destination", style="magenta")
+    table.add_column("Pieces", justify="right")
+    table.add_column("Weight (KG)", justify="right")
+    table.add_column("Volume (MC)", justify="right")
+    table.add_column("Status", style="green")
+
+    if not flights:
+        console.print("[dim yellow]No flight segment details recorded.[/dim yellow]")
+        return
+
+    for fl in flights:
+        route = f"{fl.origin} ➔ {fl.destination}"
+        pcs = f"{fl.pieces} pcs" if fl.pieces is not None else "---"
+        wt = f"{fl.weight:,.1f}" if fl.weight is not None else "---"
+        vol = f"{fl.volume:.2f}" if fl.volume is not None else "---"
+        status = f"{fl.status_message or fl.status_code or '---'}"
+        table.add_row(fl.flight_number, fl.flight_date or "N/A", route, pcs, wt, vol, status)
+
+    console.print(table)
+
+
+def render_kuwait_events(events):
+    """Render Kuwait Airways operational milestone events table."""
+    table = Table(title="[bold green]📋 Kuwait Airways - Operational Status (Audit Events)[/bold green]", box=box.ROUNDED)
+    table.add_column("Date & Time", style="cyan", no_wrap=True)
+    table.add_column("Code", style="bold yellow", justify="center")
+    table.add_column("Airport", style="magenta", justify="center")
+    table.add_column("Status", style="white")
+    table.add_column("Flight", style="blue")
+    table.add_column("Details", style="dim white")
+
+    if not events:
+        console.print("[dim yellow]No operational events recorded.[/dim yellow]")
+        return
+
+    for ev in events:
+        dt = f"{ev.event_date or ''} {ev.event_time or ''}".strip() or "N/A"
+        fl = f"{ev.flight_number} ({ev.flight_date})" if ev.flight_number else "---"
+        table.add_row(dt, ev.status_code, ev.airport or "---", ev.status_name, fl, ev.full_details or "---")
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '098-30244056' for Air India, '020-04585280' for Lufthansa, '176-63116340' for Emirates)",
+        help="One or more AWB numbers (e.g. '098-30244056' Air India, '020-04585280' Lufthansa, '176-63116340' Emirates, '229-18148900' Kuwait Airways)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229)",
     )
     parser.add_argument(
         "--view",
@@ -378,9 +476,11 @@ def main():
     lh_client = LufthansaCargoClient()
     ai_client = AirIndiaCargoClient()
     ek_client = EmiratesTrackerClient()
+    kw_client = KuwaitCargoClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
+    kw_browser = KuwaitBrowserTracker()
 
     results = []
 
@@ -390,7 +490,43 @@ def main():
             carrier = detect_carrier(raw_awb)
 
         try:
-            if carrier == "emirates":
+            if carrier == "kuwait":
+                if args.browser:
+                    with console.status(f"[bold cyan]Running live Playwright browser automation for Kuwait Airways {raw_awb}...[/bold cyan]"):
+                        clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]
+                        screenshot = f"kuwait_{clean_serial}.png"
+                        b_res = kw_browser.track_in_browser(
+                            raw_awb,
+                            headless=True,
+                            screenshot_path=screenshot,
+                        )
+                        if b_res["error"]:
+                            console.print(f"[bold red]❌ Kuwait Airways Portal Error:[/bold red] {b_res['error']}")
+                            if b_res.get("screenshot_path"):
+                                console.print(f"[bold yellow]📷 Error Screenshot saved:[/bold yellow] {screenshot}")
+                            if args.json:
+                                results.append({"awb": raw_awb, "error": b_res["error"]})
+                            continue
+                        else:
+                            console.print(f"[bold green]✔ Browser workflow completed![/bold green] Portal URL: {b_res['final_url']}")
+                            console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+                            res = b_res["tracking_result"]
+                else:
+                    with console.status(f"[bold blue]Fetching Kuwait Airways tracking for {raw_awb}...[/bold blue]"):
+                        res = kw_client.track(raw_awb)
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_kuwait_overview(res.overview, res.station_boxes)
+                    if args.view in ("all", "tracking"):
+                        render_kuwait_flights(res.flights)
+                    if args.view in ("all", "activity"):
+                        render_kuwait_events(res.operational_events)
+
+            elif carrier == "emirates":
                 if args.browser:
                     with console.status(f"[bold cyan]Running live Playwright browser automation for Emirates {raw_awb} via track-trace.com...[/bold cyan]"):
                         clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]

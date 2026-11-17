@@ -1,6 +1,6 @@
 """
 Production Multi-Carrier REST API & Interactive Web Dashboard.
-Supports Air India Cargo (098), Lufthansa Cargo (020), and Emirates SkyCargo (176).
+Supports Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), and Kuwait Airways (229).
 """
 
 import sys
@@ -22,11 +22,12 @@ from airindia_tracker.client import AirIndiaCargoClient
 from airindia_tracker.exceptions import AirIndiaTrackerException, AWBNotFoundException
 from lufthansa_tracker.client import LufthansaCargoClient
 from emirates_tracker.client import EmiratesTrackerClient, EmiratesShipmentNotFoundError, EmiratesTrackingError
+from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError, KuwaitTrackingError
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
-    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), and Emirates SkyCargo (176).",
-    version="3.0.0",
+    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), and Kuwait Airways (229).",
+    version="4.0.0",
 )
 
 app.add_middleware(
@@ -40,6 +41,7 @@ app.add_middleware(
 ai_client = AirIndiaCargoClient()
 lh_client = LufthansaCargoClient()
 ek_client = EmiratesTrackerClient()
+kw_client = KuwaitCargoClient()
 
 
 class BatchTrackRequest(BaseModel):
@@ -49,6 +51,8 @@ class BatchTrackRequest(BaseModel):
 
 def detect_carrier(awb: str) -> str:
     cleaned = re.sub(r"[\s\-_]+", "", awb.strip())
+    if cleaned.startswith("229"):
+        return "kuwait"
     if cleaned.startswith("176"):
         return "emirates"
     if cleaned.startswith("020"):
@@ -56,7 +60,7 @@ def detect_carrier(awb: str) -> str:
     if cleaned.startswith("098"):
         return "airindia"
     if len(cleaned) == 8:
-        return "lufthansa"
+        return "kuwait"
     return "airindia"
 
 
@@ -69,6 +73,7 @@ def health_check():
             "Air India (098)",
             "Lufthansa Cargo (020)",
             "Emirates SkyCargo (176)",
+            "Kuwait Airways (229)",
         ],
     }
 
@@ -76,16 +81,19 @@ def health_check():
 @app.get("/api/v1/track/{awb}", tags=["Tracking"])
 def track_shipment(
     awb: str,
-    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', or 'emirates'"),
+    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', or 'kuwait'"),
 ):
     """
     Track a shipment by AWB number.
-    Auto-detects Air India (098), Lufthansa Cargo (020), or Emirates SkyCargo (176).
+    Auto-detects Air India (098), Lufthansa Cargo (020), Emirates SkyCargo (176), or Kuwait Airways (229).
     """
-    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates") else detect_carrier(awb)
+    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait") else detect_carrier(awb)
 
     try:
-        if target_carrier == "emirates":
+        if target_carrier == "kuwait":
+            res = kw_client.track(awb)
+            return {"carrier": "Kuwait Airways", "carrier_code": "229", "data": res.dict()}
+        elif target_carrier == "emirates":
             res = ek_client.track(awb)
             return {"carrier": "Emirates SkyCargo", "carrier_code": "176", "data": res.dict()}
         elif target_carrier == "lufthansa":
@@ -94,9 +102,9 @@ def track_shipment(
         else:
             res = ai_client.track(awb)
             return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.dict()}
-    except (AWBNotFoundException, EmiratesShipmentNotFoundError, ValueError) as e:
+    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (AirIndiaTrackerException, EmiratesTrackingError) as e:
+    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
@@ -107,9 +115,11 @@ def track_batch(payload: BatchTrackRequest):
     """Track multiple AWBs concurrently across multiple carriers."""
     results = {}
     for awb in payload.awbs:
-        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates") else detect_carrier(awb)
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait") else detect_carrier(awb)
         try:
-            if target == "emirates":
+            if target == "kuwait":
+                results[awb] = {"carrier": "Kuwait Airways", "status": "success", "data": kw_client.track(awb).dict()}
+            elif target == "emirates":
                 results[awb] = {"carrier": "Emirates SkyCargo", "status": "success", "data": ek_client.track(awb).dict()}
             elif target == "lufthansa":
                 results[awb] = {"carrier": "Lufthansa Cargo", "status": "success", "data": lh_client.track(awb).dict()}
@@ -122,7 +132,7 @@ def track_batch(payload: BatchTrackRequest):
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def web_dashboard():
-    """Interactive Web Dashboard for Air India, Lufthansa Cargo & Emirates SkyCargo."""
+    """Interactive Web Dashboard for Multi-Carrier Cargo Tracking."""
     return """
 <!DOCTYPE html>
 <html lang="en">
@@ -136,8 +146,9 @@ def web_dashboard():
             --primary-lh: #05164d;
             --accent-lh: #ffb800;
             --primary-ai: #d71921;
-            --primary-ek: #d71920;
-            --accent-ek: #c49a45;
+            --primary-ek: #b91c1c;
+            --primary-kw: #0f3d6e;
+            --accent-kw: #0284c7;
             --bg: #f8fafc;
             --card-bg: #ffffff;
             --text-main: #0f172a;
@@ -150,7 +161,8 @@ def web_dashboard():
         .container { max-width: 1080px; margin: 0 auto; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
         .logo-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .badge-ek { background: #b91c1c; color: #fef08a; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #dc2626; }
+        .badge-kw { background: var(--primary-kw); color: #bae6fd; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #0284c7; }
+        .badge-ek { background: var(--primary-ek); color: #fef08a; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #dc2626; }
         .badge-ai { background: var(--primary-ai); color: white; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
         .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
         .title { font-size: 1.35rem; font-weight: 700; color: #1e293b; margin-left: 6px; }
@@ -172,6 +184,11 @@ def web_dashboard():
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); }
         .m-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
         .m-val { font-size: 1.15rem; font-weight: 700; color: #1e293b; }
+        .station-cards-wrap { padding: 1.25rem 1.75rem; background: #f8fafc; border-bottom: 1px solid var(--border); }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+        .station-box { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); }
+        .station-title { font-weight: 700; font-size: 1rem; color: #0f3d6e; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .station-detail { font-size: 0.85rem; margin-bottom: 4px; }
         .tab-bar { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; }
         .tab-item { padding: 1rem 1.25rem; border: none; background: none; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
         .tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }
@@ -190,6 +207,7 @@ def web_dashboard():
     <div class="container">
         <div class="header">
             <div class="logo-wrap">
+                <span class="badge-kw">KUWAIT (229)</span>
                 <span class="badge-ek">EMIRATES (176)</span>
                 <span class="badge-lh">LUFTHANSA (020)</span>
                 <span class="badge-ai">AIR INDIA (098)</span>
@@ -202,18 +220,20 @@ def web_dashboard():
             <div class="form-row">
                 <select id="carrierSelect" class="carrier-select">
                     <option value="auto">Auto-Detect Carrier</option>
+                    <option value="kuwait">Kuwait Airways (229)</option>
                     <option value="emirates">Emirates SkyCargo (176)</option>
                     <option value="lufthansa">Lufthansa Cargo (020)</option>
                     <option value="airindia">Air India Cargo (098)</option>
                 </select>
-                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 176-63116340, 020-04585280, 098-30244056)" value="176-63116340" />
+                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="229-18148900" />
                 <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
             </div>
             <div class="quick-links">
                 <span>Quick Samples:</span>
+                <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Valid)</button>
+                <button class="quick-btn" onclick="setAwb('229-17349566', 'kuwait')">229-17349566 (Kuwait Not Found)</button>
                 <button class="quick-btn" onclick="setAwb('176-63116340', 'emirates')">176-63116340 (Emirates)</button>
                 <button class="quick-btn" onclick="setAwb('020-04585280', 'lufthansa')">020-04585280 (Lufthansa)</button>
-                <button class="quick-btn" onclick="setAwb('04676405', 'lufthansa')">04676405 (Lufthansa 8-digit)</button>
                 <button class="quick-btn" onclick="setAwb('098-30244056', 'airindia')">098-30244056 (Air India)</button>
             </div>
         </div>
@@ -242,13 +262,18 @@ def web_dashboard():
                     <div class="m-val" id="pcsWeightDisplay">--- pcs / --- KG</div>
                 </div>
                 <div>
-                    <div class="m-lbl">Volume / Chargeable</div>
+                    <div class="m-lbl">Volume / Details</div>
                     <div class="m-val" id="volumeDisplay">---</div>
                 </div>
                 <div>
-                    <div class="m-lbl">Commodity / Product</div>
+                    <div class="m-lbl">Commodity / Current Status</div>
                     <div class="m-val" id="productDisplay">---</div>
                 </div>
+            </div>
+
+            <div class="station-cards-wrap" id="stationCardsWrap" style="display: none;">
+                <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Transit Station Checkpoints</div>
+                <div class="station-grid" id="stationGrid"></div>
             </div>
 
             <div class="tab-bar">
@@ -262,9 +287,9 @@ def web_dashboard():
                         <tr>
                             <th>Flight</th>
                             <th>Origin ➔ Destination</th>
-                            <th>Departure Time</th>
-                            <th>Arrival Time</th>
-                            <th>Aircraft / Type</th>
+                            <th>Date / Departure</th>
+                            <th>Arrival / Details</th>
+                            <th>Pieces / Weight</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -280,7 +305,7 @@ def web_dashboard():
                             <th>Code</th>
                             <th>Description</th>
                             <th>Station</th>
-                            <th>Pieces / Weight</th>
+                            <th>Flight / Pieces</th>
                             <th>State</th>
                         </tr>
                     </thead>
@@ -305,9 +330,11 @@ def web_dashboard():
             const errorBox = document.getElementById('errorBox');
             const loader = document.getElementById('loader');
             const resultCard = document.getElementById('resultCard');
+            const stationWrap = document.getElementById('stationCardsWrap');
 
             errorBox.style.display = 'none';
             resultCard.style.display = 'none';
+            stationWrap.style.display = 'none';
             loader.style.display = 'block';
 
             try {
@@ -326,7 +353,71 @@ def web_dashboard():
 
                 const topBar = document.getElementById('cardTop');
 
-                if (cName.includes('Emirates')) {
+                if (cName.includes('Kuwait')) {
+                    // Kuwait Airways
+                    topBar.style.background = '#f0f9ff';
+                    document.getElementById('statusPill').style.background = '#0f3d6e';
+                    document.getElementById('statusPill').style.color = '#bae6fd';
+                    document.getElementById('statusPill').innerText = data.overview.latest_event_code || 'DELIVERED';
+
+                    document.getElementById('latestBanner').innerHTML = `<strong>Current Status:</strong> ${data.overview.current_status}`;
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin} ➔ ${data.overview.destination}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces} pcs / ${data.overview.gross_weight} ${data.overview.weight_unit}`;
+                    document.getElementById('volumeDisplay').innerText = `${data.overview.volume} ${data.overview.volume_unit}`;
+                    document.getElementById('productDisplay').innerText = `${data.overview.current_status}`;
+
+                    // Station checkpoint boxes
+                    if (data.station_boxes && data.station_boxes.length > 0) {
+                        const sGrid = document.getElementById('stationGrid');
+                        sGrid.innerHTML = '';
+                        data.station_boxes.forEach(b => {
+                            sGrid.innerHTML += `
+                                <div class="station-box">
+                                    <div class="station-title">🏛 Station: ${b.airport}</div>
+                                    <div class="station-detail"><span class="badge-ev">${b.status_code_1 || '---'}</span> ${b.event_time_1 || 'N/A'}</div>
+                                    <div class="station-detail"><span class="badge-ev">${b.status_code_2 || '---'}</span> ${b.event_time_2 || 'N/A'}</div>
+                                    <div class="station-detail" style="color: #64748b; font-size: 0.8rem; margin-top: 4px;">${b.pieces || '---'} pcs / ${b.weight || '---'} KGS</div>
+                                </div>
+                            `;
+                        });
+                        stationWrap.style.display = 'block';
+                    }
+
+                    // Flights
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flights || []).forEach(fl => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong>${fl.flight_number}</strong></td>
+                                <td>${fl.origin} ➔ ${fl.destination}</td>
+                                <td>${fl.flight_date || 'N/A'}</td>
+                                <td>${fl.volume ? fl.volume + ' CBM' : '---'}</td>
+                                <td>${fl.pieces || '---'} pcs / ${fl.weight || '---'} KG</td>
+                                <td><span class="badge-ev">${fl.status_message || fl.status_code}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Operational events
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.operational_events || []).forEach((ev, idx) => {
+                        const dt = `${ev.event_date || ''} ${ev.event_time || ''}`.strip ? `${ev.event_date || ''} ${ev.event_time || ''}`.trim() : 'N/A';
+                        const badge = idx === 0 ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Completed</span>';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${dt}</td>
+                                <td><span class="badge-ev">${ev.status_code}</span></td>
+                                <td>${ev.status_name} <br><small style="color: #64748b;">${ev.full_details || ''}</small></td>
+                                <td><strong>${ev.airport || '---'}</strong></td>
+                                <td>${ev.flight_number ? ev.flight_number : (ev.pieces ? ev.pieces + ' pcs' : '---')}</td>
+                                <td>${badge}</td>
+                            </tr>
+                        `;
+                    });
+
+                } else if (cName.includes('Emirates')) {
                     // Emirates SkyCargo
                     topBar.style.background = '#fef2f2';
                     document.getElementById('statusPill').style.background = '#991b1b';
@@ -358,7 +449,7 @@ def web_dashboard():
                                 <td>${leg.origin.code} ➔ ${leg.destination.code}</td>
                                 <td>${dep}</td>
                                 <td>${arr}</td>
-                                <td>${ac}</td>
+                                <td>${leg.pieces || '---'} pcs</td>
                                 <td><span class="badge-ev">${leg.movement_status || 'CONF'}</span></td>
                             </tr>
                         `;
@@ -405,7 +496,7 @@ def web_dashboard():
                                 <td>${f.origin.code} ➔ ${f.destination.code}</td>
                                 <td>${f.actual_departure || f.scheduled_departure || 'N/A'}</td>
                                 <td>${f.actual_arrival || f.scheduled_arrival || 'N/A'}</td>
-                                <td>${f.aircraft_type || 'Aircraft'}</td>
+                                <td>${f.pieces || '---'} pcs</td>
                                 <td><span class="badge-ev">CONF</span></td>
                             </tr>
                         `;

@@ -1,54 +1,54 @@
 # Multi-Carrier Air Cargo Tracking System (Production-Ready)
 
 An enterprise-grade, high-performance tracking solution supporting:
+- **Kuwait Airways (`229`)** (Direct REST APIs & live portal Playwright automation)
 - **Emirates SkyCargo (`176`)** (Direct REST APIs & `track-trace.com` headless automation)
 - **Lufthansa Cargo (`020`)** (Direct REST APIs & cookie consent automation)
 - **Air India Cargo (`098`)** (iCargo Neo GraphQL integration)
 
 Built using dual architectures:
 1. **High-Speed Direct REST & GraphQL APIs** (Instant, sub-second responses, guest OAuth caching, zero bot-blocking).
-2. **Headless Browser Automation (Playwright)** (Automates `track-trace.com/aircargo` traversal, handles frame warnings, navigates to airline portals, clicks "Tracking Details", and captures full screenshots).
+2. **Headless Browser Automation (Playwright)** (Automates cookie banners, form submission, error detection, and full page visual screenshots).
 
 ---
 
 ## 🌟 Key Features
 
-### ✈ 1. Emirates SkyCargo (`176`) via track-trace.com & Direct REST
+### ✈ 1. Kuwait Airways Cargo (`229`)
+- **Portal & API Integration**:
+  - Live portal: `https://www.kuwaitairways.com/en/cargo/tracking`.
+  - High-speed direct REST API: `https://services.kuwaitairways.com/cargo/api/GetCargoInfo/229/{serial}/en`.
+- **AWB Sanitization & Prefix Handling**:
+  - Automatically handles `229-18148900`, `229 18148900`, `22918148900`, or raw 8-digit serial `18148900` (auto-extracts the last 8 digits serial for input into `#txtAwbNo` where `229` prefix is fixed).
+- **Graceful Error Handling & Bot Resilience**:
+  - Intercepts and parses `-1` response code cleanly as `KuwaitShipmentNotFoundError` (e.g. for `229-17349566`: `"Could not find AWB 229-17349566. Please check your request and try again."`).
+- **Complete AWB Details**:
+  - Route (`BOM ➔ LHR`).
+  - Pieces (`2 pcs`), Weight (`1180.0 KGS`), Volume (`1.68 CBM`).
+  - Current Status: `Delivered 1180.0 Kgs on 14-NOV-26 04:59`.
+  - Transit Station Checkpoints (`BOM`, `KWI`, `LHR`) with check-in intake and departure/delivery timestamps.
+  - Flight segments (`KU304` BOM ➔ KWI, `KU101` KWI ➔ LHR).
+  - Chronological Operational Status Events (`DLV`, `NFD`, `RCF`, `ARR`, `DEP`, `MAN`, `PRE`, `RCS`).
+
+### ✈ 2. Emirates SkyCargo (`176`) via track-trace.com & Direct REST
 - **track-trace.com Automation**:
   - Navigates to `https://www.track-trace.com/aircargo`.
-  - Enters AWB number in `Enter number...` input field (e.g. `176-63116340`).
-  - Supports **Track direct** first, with seamless fallback to **Track with options**.
-  - Handles the frame warning by clicking **"Click here to show Emirates(EK) results without frame"**.
-  - Enters Emirates SkyCargo portal, locates shipment order card, and clicks **"Tracking Details"**.
-  - Captures full visual screenshots (`emirates_results.png`, `emirates_details.png`).
+  - Enters AWB in `Enter number...` input field.
+  - Supports **Track direct** first, with fallback to **Track with options**.
+  - Clicks **"Click here to show Emirates(EK) results without frame"**.
+  - Clicks **"Tracking Details"** and captures visual screenshots.
 - **High-Speed Direct Microservices REST API**:
-  - Thread-safe guest OAuth token negotiation (`api/uaa/guest/oauth/token`) with in-memory caching.
-  - Multi-booking order discovery (`api/order/services/cargo/v1/orders/actions/search`).
-  - Order details, routing, and complete milestone event timeline (`api/order/services/cargo/v1/orders/b{BRN}`).
-- **Parsed Data Fields**:
-  - Origin & Destination (`DEL ➔ MLA`).
-  - Product & Commodity: `Emirates Pharma Plus` (`AXD`, `E0101`).
-  - Special Handling Codes (`PIL`, `CRT`, `EMD`, `ECC`, `EAP`).
-  - Pieces (`11 pcs`), Gross Weight (`1467.0 K`), Chargeable Weight (`2112.0 K`), Volume (`12.672 CM`).
-  - Booking Reference Number (`65761815`) and Job Reference Number (`65012126`).
-  - Full Flight Routing Itinerary (`EK 0513` DEL ➔ DXB, `EK 0109` DXB ➔ MLA) with scheduled vs. actual departure/arrival times and aircraft registration.
-  - Milestones Timeline (`DLV`, `NFD`, `RCF`, `ARR`, `DEP`, `MAN`, `RCS`, `BKD`).
+  - Thread-safe guest OAuth token negotiation (`api/uaa/guest/oauth/token`).
+  - Multi-booking order discovery and milestone details.
 
-### ✈ 2. Lufthansa Cargo (`020`)
-- **AWB Sanitization**: Automatically handles `020-04585280`, `020 04585280`, `02004585280`, or plain 8-digit serial `04585280` (auto-strips `020` for input fields while keeping standard format for reporting).
+### ✈ 3. Lufthansa Cargo (`020`)
+- **AWB Sanitization**: Automatically handles `020-04585280` or `04585280`.
 - **Cookie Consent**: Automatically detects and dismisses the "Cookie Settings" popup by clicking **"Deny"**.
-- **Complete AWB Details**:
-  - Latest Event (`RCF`, `DEP`, `ARR`, `MAN`, etc.) with flight descriptor.
-  - Origin & Destination airports (`DEL ➔ GRU`, `DEL ➔ MUC`).
-  - Pieces, Gross Weight (kg), Volume (cbm), Product (`General Cargo - YNZ`), Special Cargo Codes (`SLY`, `SPX`, `HEA`, etc.).
-  - Planned vs. Actual availability and acceptance times.
-  - Flight segments (scheduled vs. actual departure and arrival times, aircraft type).
-  - Chronological Status History (audit trail of all IATA cargo events).
+- **Complete AWB Details**: Flight segments, milestones, acceptance times, and status audit trail.
 
-### ✈ 3. Air India Cargo (`098`)
-- IBS Software **iCargo Neo** GraphQL integration with automated anonymous session management (`loginAsAnonymousUser`).
-- Milestone tracking (`ACCEPTED`, `DEPARTED`, `ARRIVED`, `DELIVERED`).
-- Tracking View (Flight routing & split pieces) and Activity View (complete event history with ULD container numbers).
+### ✈ 4. Air India Cargo (`098`)
+- IBS Software **iCargo Neo** GraphQL integration with anonymous session management.
+- Tracking View and Activity View with ULD container numbers.
 
 ---
 
@@ -64,32 +64,30 @@ playwright install chromium
 
 ### 2. Command-Line Interface (CLI)
 
+#### Track Kuwait Airways AWB:
+```bash
+# Direct fast tracking (Overview + Station Checkpoints + Flights + Milestones)
+python3 cli.py 229-18148900
+
+# 8-digit input (229 prefix auto-handled)
+python3 cli.py 18148900 --carrier kuwait
+
+# Run live Playwright browser automation with screenshot capture
+python3 cli.py 229-18148900 --browser
+
+# Test non-existent AWB error handling
+python3 cli.py 229-17349566
+```
+
 #### Track Emirates SkyCargo AWB:
 ```bash
-# Ultra-fast direct tracking (Overview + Itinerary Flights + Milestones)
 python3 cli.py 176-63116340
-
-# Execute full live Playwright automation via track-trace.com & save screenshots
 python3 cli.py 176-63116340 --browser
-
-# Specific views
-python3 cli.py 176-63116340 --view overview
-python3 cli.py 176-63116340 --view tracking
-python3 cli.py 176-63116340 --view activity
-
-# Raw JSON output
-python3 cli.py 176-63116340 --json
 ```
 
 #### Track Lufthansa Cargo AWB:
 ```bash
-# Direct fast tracking
 python3 cli.py 020-04585280
-
-# 8-digit input (020 prefix auto-handled)
-python3 cli.py 04676405 --carrier lufthansa
-
-# Run live Playwright browser automation with screenshot capture
 python3 cli.py 020-04585280 --browser
 ```
 
@@ -108,11 +106,10 @@ python3 server.py
 ```
 
 - **Interactive Web Dashboard**: Open `http://localhost:8000/` in your browser.
-  - Search any AWB (Emirates SkyCargo, Lufthansa Cargo, or Air India).
-  - Click quick-sample buttons (`176-63116340`, `020-04585280`, `04676405`, `098-30244056`).
-  - Toggle between Flight Movements and Event Status History.
+  - Quick-sample buttons for Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
+  - Transit Station Checkpoint cards, Flight Itinerary, and Milestone audit events.
 - **REST API Endpoints**:
-  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `176`, `020`, or `098`)
+  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `229`, `176`, `020`, or `098`)
   - `POST /api/v1/track/batch` (Batch track multiple AWBs across carriers)
   - `GET /health` (System health and carrier coverage)
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
