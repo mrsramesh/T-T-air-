@@ -4,6 +4,10 @@ Unit and integration tests for Multi-Carrier Cargo Tracker:
 - Lufthansa Cargo (020)
 - Emirates SkyCargo (176)
 - Kuwait Airways Cargo (229)
+- British Airways Cargo (125)
+- Virgin Atlantic Cargo (932)
+- Qatar Airways Cargo (157)
+- EgyptAir Cargo / Cargo Flash (077)
 """
 
 import unittest
@@ -14,6 +18,7 @@ from kuwait_tracker.client import KuwaitCargoClient, KuwaitShipmentNotFoundError
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
+from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -26,6 +31,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.parcels_client = ParcelsTrackerClient()
         self.virgin_client = VirginCargoClient()
         self.qatar_client = QatarCargoClient()
+        self.cargoflash_client = CargoFlashClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -216,6 +222,53 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(QatarShipmentNotFoundError) as ctx:
             self.qatar_client.track("157-99999999", headless=True)
         self.assertIn("No result found", str(ctx.exception))
+
+    def test_cargoflash_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.cargoflash_client.normalize_awb("077-59060002")
+        self.assertEqual(prefix, "077")
+        self.assertEqual(serial, "59060002")
+        self.assertEqual(formatted, "077-59060002")
+        self.assertEqual(full_digits, "07759060002")
+
+        # 8-digit serial input (prefix 077 auto-inferred)
+        prefix, serial, formatted, full_digits = self.cargoflash_client.normalize_awb("59060945")
+        self.assertEqual(prefix, "077")
+        self.assertEqual(serial, "59060945")
+        self.assertEqual(formatted, "077-59060945")
+        self.assertEqual(full_digits, "07759060945")
+
+    def test_live_cargoflash_tracking_del_lon(self):
+        res = self.cargoflash_client.track("077-59060002")
+        self.assertEqual(res.formatted_awb, "077-59060002")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "LON")
+        self.assertEqual(res.overview.pieces, 3)
+        self.assertEqual(res.overview.gross_weight, 304.0)
+        self.assertEqual(res.overview.latest_event_action, "RCF")
+        self.assertEqual(res.overview.latest_event_station, "LHR")
+        self.assertIn("27-Sep-2026", res.overview.latest_event_time)
+        self.assertEqual(len(res.milestone_plan), 8)
+        self.assertEqual(len(res.flight_details), 8)
+        self.assertEqual(res.flight_details[0].flight_no, "MS-5518")
+
+    def test_live_cargoflash_tracking_del_chi(self):
+        res = self.cargoflash_client.track("077-59060945")
+        self.assertEqual(res.formatted_awb, "077-59060945")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "CHI")
+        self.assertEqual(res.overview.pieces, 22)
+        self.assertEqual(res.overview.gross_weight, 169.0)
+        self.assertEqual(res.overview.latest_event_action, "RCF")
+        self.assertEqual(res.overview.latest_event_station, "ORD")
+        self.assertIn("11-Oct-2026", res.overview.latest_event_time)
+        self.assertEqual(len(res.milestone_plan), 13)
+        self.assertEqual(len(res.flight_details), 13)
+        self.assertEqual(res.flight_details[0].flight_no, "MS-5518")
+
+    def test_cargoflash_not_found_handling(self):
+        with self.assertRaises(CargoFlashShipmentNotFoundError) as ctx:
+            self.cargoflash_client.track("077-99999999")
+        self.assertIn("Could not find shipment for AWB 077-99999999", str(ctx.exception))
 
 
 if __name__ == "__main__":

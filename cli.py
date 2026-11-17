@@ -31,6 +31,7 @@ from kuwait_tracker.browser import KuwaitBrowserTracker
 from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
+from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 
 console = Console()
 
@@ -38,6 +39,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("077"):
+        return "cargoflash"
     if cleaned.startswith("157"):
         return "qatar"
     if cleaned.startswith("932"):
@@ -714,20 +717,107 @@ def render_qatar_milestones(milestones):
     console.print(table)
 
 
+# ==================== CARGO FLASH / EGYPTAIR RENDERING ====================
+
+def render_cargoflash_overview(overview):
+    """Render EgyptAir / Cargo Flash summary overview card."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+
+    grid.add_row("AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+                 "Route:", f"[bold magenta]{overview.origin} ➔ {overview.destination}[/bold magenta]")
+    vol_str = f"{overview.cbm or overview.volume:.3f} {overview.volume_unit}" if (overview.cbm or overview.volume) else "N/A"
+    chg_wt = f" (Chargeable: {overview.chargeable_weight:,.2f} KG)" if overview.chargeable_weight else ""
+    grid.add_row("Pieces:", f"{overview.pieces} pcs",
+                 "Gross Weight:", f"{overview.gross_weight:,.3f} {overview.weight_unit}{chg_wt}")
+    grid.add_row("Volume / CBM:", vol_str,
+                 "Product / Cargo:", f"[bold white]{overview.product_name}[/bold white]")
+    if overview.commodity:
+        grid.add_row("Commodity:", f"[yellow]{overview.commodity}[/yellow]", "", "")
+    if overview.agent_name:
+        grid.add_row("Agent Name:", f"[dim]{overview.agent_name}[/dim]", "", "")
+
+    grid.add_row("Latest Event:", f"[bold green]{overview.latest_event_message}[/bold green]", "", "")
+
+    console.print(Panel(grid, title=f"[bold #002d62]🇪🇬 {overview.carrier}[/bold #002d62] - [bold white]{overview.formatted_awb}[/bold white]", border_style="blue", box=box.ROUNDED))
+
+
+def render_cargoflash_milestone_plan(milestones):
+    """Render Cargo Flash Milestone Plan sequence."""
+    table = Table(title="[bold cyan]📌 EgyptAir Cargo - Milestone Plan (Sequential Execution)[/bold cyan]", box=box.ROUNDED)
+    table.add_column("Step", style="dim", justify="center")
+    table.add_column("Action", style="bold yellow", justify="center")
+    table.add_column("Station", style="bold cyan", justify="center")
+    table.add_column("Event Date & Time", style="white")
+    table.add_column("Pieces", justify="right", style="green")
+
+    if not milestones:
+        console.print("[dim yellow]No milestone plan available.[/dim yellow]")
+        return
+
+    for idx, m in enumerate(milestones, start=1):
+        table.add_row(
+            str(idx),
+            m.action,
+            m.station,
+            m.date_time or "N/A",
+            f"{m.pieces} pcs" if m.pieces is not None else "---"
+        )
+
+    console.print(table)
+
+
+def render_cargoflash_flights(flights):
+    """Render Cargo Flash Flight Details table."""
+    table = Table(title="[bold magenta]🛫 EgyptAir Cargo - Flight Details & Manifested Schedule[/bold magenta]", box=box.ROUNDED)
+    table.add_column("Event", style="bold cyan", justify="center")
+    table.add_column("Description", style="white")
+    table.add_column("Station", style="bold yellow", justify="center")
+    table.add_column("Flight No / Route", style="bold red")
+    table.add_column("Flight Date", style="white")
+    table.add_column("Total Pcs", justify="right")
+    table.add_column("Planned Pcs", justify="right")
+    table.add_column("Gross Weight", justify="right", style="bold green")
+
+    if not flights:
+        console.print("[dim yellow]No flight details recorded.[/dim yellow]")
+        return
+
+    for f in flights:
+        pcs_total = str(f.total_pieces) if f.total_pieces is not None else "---"
+        pcs_plan = str(f.planned_pieces) if f.planned_pieces is not None else "---"
+        wt = f"{f.gross_weight:,.2f} KG" if f.gross_weight is not None else "---"
+        table.add_row(
+            f.event,
+            f.description,
+            f.station,
+            f.flight_display,
+            f.flight_date or "N/A",
+            pcs_total,
+            pcs_plan,
+            wt
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        help="One or more AWB numbers (e.g. '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "parcels"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "cargoflash", "egyptair", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157, 077)",
     )
     parser.add_argument(
         "--view",
@@ -755,6 +845,7 @@ def main():
     parcels_client = ParcelsTrackerClient()
     virgin_client = VirginCargoClient()
     qatar_client = QatarCargoClient()
+    cargoflash_client = CargoFlashClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -916,6 +1007,25 @@ def main():
                         render_qatar_flights(res.flights)
                     if args.view in ("all", "activity"):
                         render_qatar_milestones(res.milestones)
+
+            elif carrier in ("cargoflash", "egyptair"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]
+                screenshot = f"cargoflash_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold blue]Tracking EgyptAir Cargo / Cargo Flash {raw_awb}...[/bold blue]"):
+                    res = cargoflash_client.track(raw_awb, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_cargoflash_overview(res.overview)
+                    if args.view in ("all", "activity", "tracking"):
+                        render_cargoflash_milestone_plan(res.milestone_plan)
+                        render_cargoflash_flights(res.flight_details)
 
             else:
                 # Default to Air India
