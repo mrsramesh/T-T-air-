@@ -1,6 +1,7 @@
 # Multi-Carrier Air Cargo Tracking System (Production-Ready)
 
 An enterprise-grade, high-performance tracking solution supporting:
+- **Neos Air Cargo (`703`)** (`world-cs.com` World Cargo Solutions / WCS Group, `parcelsapp.com`, & `track-trace.com/aircargo`)
 - **EgyptAir Cargo (`077`)** (`msres.cargoflash.com` Cargo Flash portal & direct WCF JSON API)
 - **Qatar Airways Cargo (`157`)** (`qrcargo.com/s/track-your-shipment` Experience Cloud LWC portal automation)
 - **Virgin Atlantic Cargo (`932`)** (`myvs.virginatlanticcargo.com` Accelya Offer & Order portal automation)
@@ -11,12 +12,37 @@ An enterprise-grade, high-performance tracking solution supporting:
 - **Air India Cargo (`098`)** (iCargo Neo GraphQL integration)
 
 Built using dual architectures:
-1. **High-Speed Direct REST, WCF & GraphQL APIs** (Instant, sub-second responses, guest OAuth caching, zero bot-blocking).
+1. **High-Speed Direct REST, WCF, AJAX & GraphQL APIs** (Instant, sub-second responses, guest OAuth caching, zero bot-blocking).
 2. **Headless Browser Automation (Playwright)** (Automates cookie banners, form submission, Salesforce Aura Apex interception, anti-bot stealth WebGL spoofing, error detection, and full page visual screenshots).
 
 ---
 
 ## 🌟 Key Features
+
+### 🇮🇹 1. Neos Air Cargo (`703`) via World Cargo Solutions (WCS) & ParcelsApp
+- **Portal & Tracking Workflow**:
+  - Live portal: `https://world-cs.com/en#tracking-form` (embedded by `https://www.track-trace.com/aircargo`).
+  - High-speed direct OctoberCMS AJAX endpoint: `https://world-cs.com/en` with handler `onTracking` (~0.3s response).
+  - ParcelsApp fallback: `https://parcelsapp.com/en/tracking/{awb}`.
+  - Automatically handles dynamic AWB input: cleans input, detects prefix `703` and serial, and fetches full data.
+  - Expands collapsed table rows (`+` button) to extract 100% of the milestone history and flight routing.
+- **Complete Extracted Details (Verified on Targets)**:
+  - **AWB `703-13715800` (DEL ➔ KWI)**:
+    - Route: `DEL` ➔ `KWI`.
+    - Pieces: 69 pcs | Gross Weight: 1535 kg | Commodity: `READY MADE GARM`.
+    - Current Status: `DLV - Delivered (KWI)` on `2026-11-16T18:49:00`.
+    - Flight Schedule: `J9410/15NOV26 (DEL -> KWI)`, Dep: `2026-11-15T07:25:00`, Arr: `2026-11-15T09:45:00`.
+    - 10 Chronological Milestones: `KK (Booked)` ➔ `RCS (Received From Shipper)` ➔ `MAN (Manifested)` ➔ `DEP` ➔ `ARR` ➔ `RCF` ➔ `NFD (Notified)` ➔ `DLV (Delivered)`.
+  - **AWB `703-13715332` (DEL ➔ JED)**:
+    - Route: `DEL` ➔ `JED` (via Dammam `DMM`).
+    - Pieces: 40 pcs | Gross Weight: 641 kg | Commodity: `FEEDING BOTTLES`.
+    - Current Status: `DLV - Delivered (JED)` on `2026-10-28T16:28:00`.
+    - 2 Flight Legs:
+      - `XY907/25OCT26 (DEL -> DMM)`
+      - `XY419/26OCT26 (DMM -> JED)`
+    - 32 Chronological Milestones: complete audit trail from booking through multi-leg transfer to final delivery.
+
+---
 
 ### 🇪🇬 1. EgyptAir Cargo (`077`) via Cargo Flash Portal & Direct WCF API
 - **Portal & Tracking Workflow**:
@@ -154,6 +180,19 @@ playwright install chromium
 
 ### 2. Command-Line Interface (CLI)
 
+#### Track Neos Air Cargo AWB (via World Cargo Solutions & ParcelsApp):
+```bash
+# Auto-detect carrier by prefix 703
+python3 cli.py 703-13715800
+python3 cli.py 703-13715332
+
+# 8-digit serial input (prefix 703 auto-handled)
+python3 cli.py 13715800 --carrier neos
+
+# Capture full page visual screenshot
+python3 cli.py 703-13715800 --browser
+```
+
 #### Track EgyptAir Cargo AWB (via Cargo Flash Portal):
 ```bash
 # Auto-detect carrier by prefix 077
@@ -236,12 +275,12 @@ python3 server.py
 ```
 
 - **Interactive Web Dashboard**: Open `http://localhost:8000/` in your browser.
-  - Quick-sample buttons for EgyptAir Cargo (`077-59060002`, `077-59060945`), Qatar Airways (`157-5366-1580`), Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
+  - Quick-sample buttons for Neos Air Cargo (`703-13715800`, `703-13715332`), EgyptAir Cargo (`077-59060002`, `077-59060945`), Qatar Airways (`157-5366-1580`), Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
   - Real-time status pills, route map overview, package weights, flight legs, and timeline milestone events.
 - **REST API Endpoints**:
-  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `077`, `157`, `932`, `125`, `229`, `176`, `020`, or `098`)
+  - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `703`, `077`, `157`, `932`, `125`, `229`, `176`, `020`, or `098`)
   - `POST /api/v1/track/batch` (Batch track multiple AWBs across carriers)
-  - `GET /health` (System health and carrier coverage for all 8 airlines)
+  - `GET /health` (System health and carrier coverage for all 9 airlines)
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
 
 ---

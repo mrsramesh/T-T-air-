@@ -32,6 +32,7 @@ from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFound
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
+from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
 
 console = Console()
 
@@ -39,6 +40,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("703"):
+        return "neos"
     if cleaned.startswith("077"):
         return "cargoflash"
     if cleaned.startswith("157"):
@@ -804,20 +807,110 @@ def render_cargoflash_flights(flights):
     console.print(table)
 
 
+# ==================== NEOS AIR CARGO / WCS RENDERING ====================
+
+def render_neos_overview(overview):
+    """Render Neos Air Cargo / WCS summary card."""
+    status_color = "green" if "DLV" in overview.current_status else "yellow"
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold cyan", justify="right")
+    grid.add_column()
+
+    pcs_str = f"{overview.pieces} pcs" if overview.pieces else "---"
+    grid.add_row("AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+                 "Route:", f"[bold magenta]{overview.origin} ➔ {overview.destination}[/bold magenta]")
+    grid.add_row("Pieces:", pcs_str,
+                 "Gross Weight:", f"[bold green]{overview.gross_weight or '---'}[/bold green]")
+    grid.add_row("Commodity:", f"[bold yellow]{overview.commodity or 'GENERAL CARGO'}[/bold yellow]",
+                 "Progress Step:", f"[bold cyan]{overview.progress_step or 'In Transit'}[/bold cyan]")
+    grid.add_row("Current Status:", f"[bold {status_color}]{overview.current_status}[/bold {status_color}]",
+                 "Latest Time:", f"{overview.latest_event_time or 'N/A'}")
+    grid.add_row("Carrier / Portal:", f"[dim]{overview.airline}[/dim]",
+                 "Data Source:", f"[dim]{overview.source}[/dim]")
+
+    console.print(Panel(grid, title=f"[bold red]✈ Neos Air Cargo (NO) / WCS (703)[/bold red] - [bold white]{overview.formatted_awb}[/bold white]", border_style="red", box=box.ROUNDED))
+
+
+def render_neos_flights(flights):
+    """Render Neos Air Cargo / WCS Flight Schedule table."""
+    table = Table(title="[bold magenta]🛫 Neos Air Cargo - Flight Routing & Itinerary[/bold magenta]", box=box.ROUNDED)
+    table.add_column("Flight No / Route", style="bold red")
+    table.add_column("Origin ➔ Destination", style="bold cyan", justify="center")
+    table.add_column("Status / Movement", style="bold yellow")
+    table.add_column("Gross Weight", justify="right", style="bold green")
+    table.add_column("Departure Time", style="white")
+    table.add_column("Arrival Time", style="white")
+
+    if not flights:
+        console.print("[dim yellow]No flight segment details recorded.[/dim yellow]")
+        return
+
+    for f in flights:
+        table.add_row(
+            f.flight_no,
+            f"{f.origin} ➔ {f.destination}",
+            f.status,
+            f.weight or "---",
+            f.departure_time or "N/A",
+            f.arrival_time or "N/A"
+        )
+
+    console.print(table)
+
+
+def render_neos_milestones(milestones):
+    """Render Neos Air Cargo / WCS chronological milestone events table."""
+    table = Table(title="[bold cyan]📌 Neos Air Cargo - Shipment Milestones & Audit Trail[/bold cyan]", box=box.ROUNDED)
+    table.add_column("#", style="dim", justify="center")
+    table.add_column("Event Date & Time", style="white")
+    table.add_column("Code", style="bold yellow", justify="center")
+    table.add_column("Description", style="white")
+    table.add_column("Sector", style="bold cyan", justify="center")
+    table.add_column("Flight No", style="bold red", justify="center")
+    table.add_column("Pieces", justify="right", style="green")
+    table.add_column("Weight", justify="right", style="bold green")
+    table.add_column("State", justify="center")
+
+    if not milestones:
+        console.print("[dim yellow]No milestone records available.[/dim yellow]")
+        return
+
+    for m in milestones:
+        badge = "[bold green]LATEST[/bold green]" if m.is_latest else "[dim]Historical[/dim]"
+        sector = f"{m.origin} ➔ {m.destination}" if (m.origin and m.destination) else (m.destination or "---")
+        pcs_txt = f"{m.pieces} pcs" if m.pieces is not None else "---"
+        table.add_row(
+            str(m.step),
+            m.timestamp or "N/A",
+            m.status_code,
+            m.description,
+            sector,
+            m.flight_no or "---",
+            pcs_txt,
+            m.weight or "---",
+            badge
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo, Neos Air Cargo)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        help="One or more AWB numbers (e.g. '703-13715800' Neos Air Cargo, '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "cargoflash", "egyptair", "parcels"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "cargoflash", "egyptair", "neos", "wcs", "neosair", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157, 077)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157, 077, 703)",
     )
     parser.add_argument(
         "--view",
@@ -846,6 +939,7 @@ def main():
     virgin_client = VirginCargoClient()
     qatar_client = QatarCargoClient()
     cargoflash_client = CargoFlashClient()
+    neos_client = NeosCargoClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -1026,6 +1120,26 @@ def main():
                     if args.view in ("all", "activity", "tracking"):
                         render_cargoflash_milestone_plan(res.milestone_plan)
                         render_cargoflash_flights(res.flight_details)
+
+            elif carrier in ("neos", "neosair", "wcs"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]
+                screenshot = f"neos_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold red]Tracking Neos Air Cargo / World Cargo Solutions {raw_awb}...[/bold red]"):
+                    res = neos_client.track(raw_awb, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_neos_overview(res.overview)
+                    if args.view in ("all", "tracking"):
+                        render_neos_flights(res.flights)
+                    if args.view in ("all", "activity"):
+                        render_neos_milestones(res.milestones)
 
             else:
                 # Default to Air India

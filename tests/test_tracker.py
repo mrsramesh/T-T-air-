@@ -8,6 +8,7 @@ Unit and integration tests for Multi-Carrier Cargo Tracker:
 - Virgin Atlantic Cargo (932)
 - Qatar Airways Cargo (157)
 - EgyptAir Cargo / Cargo Flash (077)
+- Neos Air Cargo / World Cargo Solutions (703)
 """
 
 import unittest
@@ -19,6 +20,7 @@ from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFound
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
+from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -32,6 +34,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.virgin_client = VirginCargoClient()
         self.qatar_client = QatarCargoClient()
         self.cargoflash_client = CargoFlashClient()
+        self.neos_client = NeosCargoClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -269,6 +272,56 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(CargoFlashShipmentNotFoundError) as ctx:
             self.cargoflash_client.track("077-99999999")
         self.assertIn("Could not find shipment for AWB 077-99999999", str(ctx.exception))
+
+    def test_neos_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.neos_client.normalize_awb("703-13715800")
+        self.assertEqual(prefix, "703")
+        self.assertEqual(serial, "13715800")
+        self.assertEqual(formatted, "703-13715800")
+        self.assertEqual(full_digits, "70313715800")
+
+        # Serial only (prefix 703 auto-inferred)
+        prefix, serial, formatted, full_digits = self.neos_client.normalize_awb("13715332")
+        self.assertEqual(prefix, "703")
+        self.assertEqual(serial, "13715332")
+        self.assertEqual(formatted, "703-13715332")
+        self.assertEqual(full_digits, "70313715332")
+
+    def test_live_neos_tracking_del_kwi(self):
+        res = self.neos_client.track("703-13715800")
+        self.assertEqual(res.formatted_awb, "703-13715800")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "KWI")
+        self.assertEqual(res.overview.pieces, 69)
+        self.assertEqual(res.overview.commodity, "READY MADE GARM")
+        self.assertIn("1535", res.overview.gross_weight or "")
+        self.assertEqual(res.overview.latest_event_code, "DLV")
+        self.assertEqual(len(res.flights), 1)
+        self.assertEqual(res.flights[0].flight_no, "J9410/15NOV26")
+        self.assertEqual(len(res.milestones), 10)
+        self.assertEqual(res.milestones[0].status_code, "DLV")
+        self.assertTrue(res.milestones[0].is_latest)
+
+    def test_live_neos_tracking_del_jed(self):
+        res = self.neos_client.track("703-13715332")
+        self.assertEqual(res.formatted_awb, "703-13715332")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "JED")
+        self.assertEqual(res.overview.pieces, 40)
+        self.assertEqual(res.overview.commodity, "FEEDING BOTTLES")
+        self.assertIn("641", res.overview.gross_weight or "")
+        self.assertEqual(res.overview.latest_event_code, "DLV")
+        self.assertEqual(len(res.flights), 2)
+        self.assertEqual(res.flights[0].flight_no, "XY907/25OCT26")
+        self.assertEqual(res.flights[1].flight_no, "XY419/26OCT26")
+        self.assertEqual(len(res.milestones), 32)
+        self.assertEqual(res.milestones[0].status_code, "DLV")
+        self.assertTrue(res.milestones[0].is_latest)
+
+    def test_neos_not_found_handling(self):
+        with self.assertRaises(NeosShipmentNotFoundError) as ctx:
+            self.neos_client.track("703-99999999")
+        self.assertIn("Could not find shipment for AWB 703-99999999", str(ctx.exception))
 
 
 if __name__ == "__main__":

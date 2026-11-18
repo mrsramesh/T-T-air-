@@ -27,11 +27,12 @@ from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFound
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError, VirginTrackingError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError, QatarTrackingError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError, CargoFlashTrackingError
+from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError, NeosTrackingError
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
-    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), Kuwait Airways (229), British Airways Cargo (125), Virgin Atlantic Cargo (932), Qatar Airways Cargo (157), and EgyptAir Cargo (077).",
-    version="8.0.0",
+    description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), Kuwait Airways (229), British Airways Cargo (125), Virgin Atlantic Cargo (932), Qatar Airways Cargo (157), EgyptAir Cargo (077), and Neos Air Cargo (703).",
+    version="9.0.0",
 )
 
 app.add_middleware(
@@ -50,6 +51,7 @@ parcels_client = ParcelsTrackerClient()
 virgin_client = VirginCargoClient()
 qatar_client = QatarCargoClient()
 cargoflash_client = CargoFlashClient()
+neos_client = NeosCargoClient()
 
 
 class BatchTrackRequest(BaseModel):
@@ -59,6 +61,8 @@ class BatchTrackRequest(BaseModel):
 
 def detect_carrier(awb: str) -> str:
     cleaned = re.sub(r"[\s\-_]+", "", awb.strip())
+    if cleaned.startswith("703"):
+        return "neos"
     if cleaned.startswith("077"):
         return "cargoflash"
     if cleaned.startswith("157"):
@@ -94,6 +98,7 @@ def health_check():
             "Virgin Atlantic Cargo (932)",
             "Qatar Airways Cargo (157)",
             "EgyptAir Cargo / Cargo Flash (077)",
+            "Neos Air Cargo (NO) / WCS (703)",
         ],
     }
 
@@ -101,16 +106,19 @@ def health_check():
 @app.get("/api/v1/track/{awb}", tags=["Tracking"])
 def track_shipment(
     awb: str,
-    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', 'kuwait', 'britishairways', 'virgin', 'qatar', or 'cargoflash'"),
+    carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', 'kuwait', 'britishairways', 'virgin', 'qatar', 'cargoflash', or 'neos'"),
 ):
     """
     Track a shipment by AWB number.
-    Auto-detects EgyptAir Cargo (077), Qatar Airways (157), Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
+    Auto-detects Neos Air Cargo (703), EgyptAir Cargo (077), Qatar Airways (157), Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
     """
-    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "parcels") else detect_carrier(awb)
+    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "parcels") else detect_carrier(awb)
 
     try:
-        if target_carrier in ("cargoflash", "egyptair"):
+        if target_carrier in ("neos", "neosair", "wcs"):
+            res = neos_client.track(awb)
+            return {"carrier": "Neos Air Cargo (NO) / WCS", "carrier_code": "703", "data": res.dict()}
+        elif target_carrier in ("cargoflash", "egyptair"):
             res = cargoflash_client.track(awb)
             return {"carrier": "EgyptAir Cargo (Cargo Flash)", "carrier_code": "077", "data": res.dict()}
         elif target_carrier in ("qatar", "qrcargo"):
@@ -134,9 +142,9 @@ def track_shipment(
         else:
             res = ai_client.track(awb)
             return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.dict()}
-    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, QatarShipmentNotFoundError, CargoFlashShipmentNotFoundError, ValueError) as e:
+    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, QatarShipmentNotFoundError, CargoFlashShipmentNotFoundError, NeosShipmentNotFoundError, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError, QatarTrackingError, CargoFlashTrackingError) as e:
+    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError, QatarTrackingError, CargoFlashTrackingError, NeosTrackingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
@@ -147,9 +155,11 @@ def track_batch(payload: BatchTrackRequest):
     """Track multiple AWBs concurrently across multiple carriers."""
     results = {}
     for awb in payload.awbs:
-        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "parcels") else detect_carrier(awb)
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "parcels") else detect_carrier(awb)
         try:
-            if target in ("cargoflash", "egyptair"):
+            if target in ("neos", "neosair", "wcs"):
+                results[awb] = {"carrier": "Neos Air Cargo (NO) / WCS", "status": "success", "data": neos_client.track(awb).dict()}
+            elif target in ("cargoflash", "egyptair"):
                 results[awb] = {"carrier": "EgyptAir Cargo (Cargo Flash)", "status": "success", "data": cargoflash_client.track(awb).dict()}
             elif target in ("qatar", "qrcargo"):
                 results[awb] = {"carrier": "Qatar Airways Cargo", "status": "success", "data": qatar_client.track(awb).dict()}
@@ -201,6 +211,7 @@ def web_dashboard():
         .container { max-width: 1080px; margin: 0 auto; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
         .logo-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .badge-no { background: #991b1b; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #7f1d1d; }
         .badge-ms { background: #002d62; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #1e40af; }
         .badge-qr { background: #5c0632; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #8a0c4d; }
         .badge-vs { background: #e10a0a; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; border: 1px solid #7c0404; }
@@ -251,6 +262,7 @@ def web_dashboard():
     <div class="container">
         <div class="header">
             <div class="logo-wrap">
+                <span class="badge-no">NEOS AIR (703)</span>
                 <span class="badge-ms">EGYPTAIR (077)</span>
                 <span class="badge-qr">QATAR AIRWAYS (157)</span>
                 <span class="badge-vs">VIRGIN ATLANTIC (932)</span>
@@ -268,6 +280,7 @@ def web_dashboard():
             <div class="form-row">
                 <select id="carrierSelect" class="carrier-select">
                     <option value="auto">Auto-Detect Carrier</option>
+                    <option value="neos">Neos Air Cargo (703)</option>
                     <option value="cargoflash">EgyptAir Cargo (077)</option>
                     <option value="qatar">Qatar Airways Cargo (157)</option>
                     <option value="virgin">Virgin Atlantic Cargo (932)</option>
@@ -277,11 +290,13 @@ def web_dashboard():
                     <option value="lufthansa">Lufthansa Cargo (020)</option>
                     <option value="airindia">Air India Cargo (098)</option>
                 </select>
-                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 077-59060002, 157-5366-1580, 932-78989514, 125-24128344, 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="077-59060002" />
+                <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 703-13715800, 077-59060002, 157-5366-1580, 932-78989514, 125-24128344, 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="703-13715800" />
                 <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
             </div>
             <div class="quick-links">
                 <span>Quick Samples:</span>
+                <button class="quick-btn" onclick="setAwb('703-13715800', 'neos')">703-13715800 (Neos KWI)</button>
+                <button class="quick-btn" onclick="setAwb('703-13715332', 'neos')">703-13715332 (Neos JED)</button>
                 <button class="quick-btn" onclick="setAwb('077-59060002', 'cargoflash')">077-59060002 (EgyptAir LON)</button>
                 <button class="quick-btn" onclick="setAwb('077-59060945', 'cargoflash')">077-59060945 (EgyptAir ORD)</button>
                 <button class="quick-btn" onclick="setAwb('157-5366-1580', 'qatar')">157-5366-1580 (Qatar Airways)</button>
@@ -411,7 +426,57 @@ def web_dashboard():
 
                 const topBar = document.getElementById('cardTop');
 
-                if (cName.includes('EgyptAir') || cName.includes('Cargo Flash')) {
+                if (cName.includes('Neos') || cName.includes('WCS') || cName.includes('703')) {
+                    // Neos Air Cargo / World Cargo Solutions
+                    topBar.style.background = '#fef2f2';
+                    document.getElementById('statusPill').style.background = '#991b1b';
+                    document.getElementById('statusPill').style.color = '#ffffff';
+                    document.getElementById('statusPill').innerText = data.overview.latest_event_code || 'DELIVERED';
+
+                    const comm = data.overview.commodity ? ` &bull; Commodity: <em>${data.overview.commodity}</em>` : '';
+                    const src = data.overview.source ? ` &bull; Source: <em>${data.overview.source}</em>` : '';
+                    document.getElementById('latestBanner').innerHTML = `<strong>Neos Air Cargo (WCS):</strong> ${data.overview.current_status}${comm}${src}`;
+
+                    document.getElementById('routeDisplay').innerText = `${data.overview.origin} ➔ ${data.overview.destination}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces || '---'} pcs / ${data.overview.gross_weight || '---'}`;
+                    document.getElementById('volumeDisplay').innerText = `Step: ${data.overview.progress_step || 'Delivered'}`;
+                    document.getElementById('productDisplay').innerText = `${data.overview.commodity || 'GENERAL CARGO'}`;
+
+                    // Flights & Routing Tab
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flights || []).forEach(fl => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color: #991b1b;">${fl.flight_display || fl.flight_no}</strong></td>
+                                <td>${fl.origin} ➔ ${fl.destination}</td>
+                                <td>${fl.departure_time || 'N/A'}</td>
+                                <td>${fl.arrival_time || 'N/A'}</td>
+                                <td>${fl.weight || data.overview.gross_weight || '---'}</td>
+                                <td><span class="badge-ev">${fl.status}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Shipment History / Milestones Tab
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.milestones || []).forEach(m => {
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Historical</span>';
+                        const sector = (m.origin && m.destination) ? `${m.origin} ➔ ${m.destination}` : m.destination;
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${m.timestamp || 'N/A'}</td>
+                                <td><span class="badge-ev">${m.status_code}</span></td>
+                                <td>${m.description}</td>
+                                <td><strong>${sector || '---'}</strong></td>
+                                <td>${m.flight_no ? m.flight_no : (m.pieces ? m.pieces + ' pcs' : '---')}</td>
+                                <td>${badge}</td>
+                            </tr>
+                        `;
+                    });
+
+                } else if (cName.includes('EgyptAir') || cName.includes('Cargo Flash')) {
                     // EgyptAir Cargo / Cargo Flash
                     topBar.style.background = '#f0fdf4';
                     document.getElementById('statusPill').style.background = '#064e3b';
