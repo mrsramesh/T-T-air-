@@ -21,6 +21,7 @@ from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
+from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -35,6 +36,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.qatar_client = QatarCargoClient()
         self.cargoflash_client = CargoFlashClient()
         self.neos_client = NeosCargoClient()
+        self.indigo_client = IndigoCargoClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -322,6 +324,44 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(NeosShipmentNotFoundError) as ctx:
             self.neos_client.track("703-99999999")
         self.assertIn("Could not find shipment for AWB 703-99999999", str(ctx.exception))
+
+    def test_indigo_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.indigo_client.normalize_awb("312-9298-9396")
+        self.assertEqual(prefix, "312")
+        self.assertEqual(serial, "92989396")
+        self.assertEqual(formatted, "312-92989396")
+        self.assertEqual(full_digits, "31292989396")
+
+        # Serial only (prefix 312 auto-inferred)
+        prefix, serial, formatted, full_digits = self.indigo_client.normalize_awb("92989396")
+        self.assertEqual(prefix, "312")
+        self.assertEqual(serial, "92989396")
+        self.assertEqual(formatted, "312-92989396")
+        self.assertEqual(full_digits, "31292989396")
+
+    def test_live_indigo_tracking_bom_bkk(self):
+        res = self.indigo_client.track("312-9298-9396")
+        self.assertEqual(res.formatted_awb, "312-92989396")
+        self.assertEqual(res.overview.origin, "BOM")
+        self.assertEqual(res.overview.destination, "BKK")
+        self.assertEqual(res.overview.pieces, 62)
+        self.assertEqual(res.overview.gross_weight, "898.00 Kgs")
+        self.assertEqual(res.overview.current_status, "Delivered at BKK")
+        self.assertEqual(res.overview.issued_to, "ESSILOR MANUFACTURING THAILAND")
+        self.assertEqual(len(res.booking_info), 2)
+        self.assertEqual(res.booking_info[0].status, "Booked")
+        self.assertEqual(res.booking_info[1].status, "Accepted")
+        self.assertEqual(len(res.status_history), 4)
+        self.assertEqual(res.status_history[-1].milestone, "Delivered")
+        self.assertTrue(res.status_history[-1].is_latest)
+        self.assertEqual(len(res.delivery_orders), 1)
+        self.assertEqual(res.delivery_orders[0].do_number, "DO-BKK-14774813")
+        self.assertEqual(res.delivery_orders[0].issued_to, "ESSILOR MANUFACTURING THAILAND")
+
+    def test_indigo_not_found_handling(self):
+        with self.assertRaises(IndigoShipmentNotFoundError) as ctx:
+            self.indigo_client.track("312-99999999")
+        self.assertIn("Could not find shipment for AWB 312-99999999", str(ctx.exception))
 
 
 if __name__ == "__main__":

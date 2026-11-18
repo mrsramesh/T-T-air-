@@ -6,6 +6,7 @@ Supports direct OctoberCMS AJAX API, ParcelsApp tracking, and Playwright browser
 import os
 import re
 import socket
+import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -258,18 +259,24 @@ class NeosCargoClient:
             "language": "tuk",
         }
 
-        try:
-            resp = session.post(
-                WCS_PORTAL_URL,
-                data=data,
-                headers=headers,
-                timeout=self.timeout_sec,
-            )
-            resp.raise_for_status()
-            json_data = resp.json()
-            html = json_data.get("__ajax", {}).get("ops", [{}])[0].get("html", "")
-        except Exception as e:
-            raise NeosTrackingError(f"World Cargo Solutions API query failed: {e}")
+        html = ""
+        for attempt in range(2):
+            try:
+                resp = session.post(
+                    WCS_PORTAL_URL,
+                    data=data,
+                    headers=headers,
+                    timeout=self.timeout_sec,
+                )
+                resp.raise_for_status()
+                json_data = resp.json()
+                html = json_data.get("__ajax", {}).get("ops", [{}])[0].get("html", "")
+                if html:
+                    break
+            except Exception as e:
+                if attempt == 1:
+                    raise NeosTrackingError(f"World Cargo Solutions API query failed: {e}")
+                time.sleep(1)
 
         result = self.parse_wcs_html(html, formatted_awb)
         if not result:

@@ -33,6 +33,7 @@ from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
+from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError
 
 console = Console()
 
@@ -40,6 +41,8 @@ console = Console()
 def detect_carrier(awb_input: str) -> str:
     """Detect carrier by AWB prefix."""
     cleaned = re.sub(r"[\s\-_]+", "", awb_input.strip())
+    if cleaned.startswith("312"):
+        return "indigo"
     if cleaned.startswith("703"):
         return "neos"
     if cleaned.startswith("077"):
@@ -897,20 +900,150 @@ def render_neos_milestones(milestones):
     console.print(table)
 
 
+# ==================== INDIGO CARGO (6E - 312) RENDERING ====================
+
+def render_indigo_overview(overview):
+    """Render IndiGo CarGo summary overview card."""
+    status_lower = overview.current_status.lower()
+    status_color = "green" if "delivered" in status_lower else ("yellow" if "departed" in status_lower or "arrived" in status_lower else "cyan")
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold blue", justify="right")
+    grid.add_column()
+    grid.add_column(style="bold blue", justify="right")
+    grid.add_column()
+
+    grid.add_row(
+        "AWB Number:", f"[bold white]{overview.formatted_awb}[/bold white]",
+        "Route:", f"[bold magenta]{overview.origin} ➔ {overview.destination}[/bold magenta]"
+    )
+    pcs_txt = f"{overview.pieces} pcs" if overview.pieces is not None else "---"
+    grid.add_row(
+        "Pieces:", pcs_txt,
+        "Gross Weight:", f"{overview.gross_weight or '---'}"
+    )
+    grid.add_row(
+        "Flight Details:", f"[bold cyan]{overview.flight_no or 'N/A'}[/bold cyan]",
+        "Issued To:", f"[bold yellow]{overview.issued_to or 'N/A'}[/bold yellow]"
+    )
+    grid.add_row(
+        "Latest Activity:", f"[bold white]{overview.latest_activity}[/bold white]",
+        "Overall Status:", f"[bold {status_color} on default] {overview.current_status} [/bold {status_color} on default]"
+    )
+
+    console.print(Panel(
+        grid,
+        title=f"[bold blue]✈ IndiGo CarGo (6E) - SmartKargo[/bold blue] - [bold white]{overview.formatted_awb}[/bold white]",
+        border_style="blue",
+        box=box.ROUNDED
+    ))
+
+
+def render_indigo_booking_info(booking_items):
+    """Render IndiGo CarGo Booking & Acceptance Information table."""
+    table = Table(title="[bold blue]📋 IndiGo CarGo - Booking & Acceptance Information[/bold blue]", box=box.ROUNDED)
+    table.add_column("Status", style="bold cyan", justify="center")
+    table.add_column("Station", style="bold white", justify="center")
+    table.add_column("Destination", style="bold magenta", justify="center")
+    table.add_column("Pieces", justify="right", style="green")
+    table.add_column("Weight (Kgs)", justify="right", style="bold green")
+    table.add_column("Flight No / Details", style="bold yellow")
+
+    if not booking_items:
+        console.print("[dim yellow]No booking info records available.[/dim yellow]")
+        return
+
+    for item in booking_items:
+        pcs_txt = str(item.pieces) if item.pieces is not None else "---"
+        table.add_row(
+            item.status,
+            item.station,
+            item.destination,
+            pcs_txt,
+            item.weight or "---",
+            item.flight_no or "---"
+        )
+
+    console.print(table)
+
+
+def render_indigo_status_history(status_history):
+    """Render IndiGo CarGo Status History & Shipment Milestones table."""
+    table = Table(title="[bold blue]📌 IndiGo CarGo - Status History & Shipment Milestones[/bold blue]", box=box.ROUNDED)
+    table.add_column("Station", style="bold white", justify="center")
+    table.add_column("Milestone / Status", style="bold yellow")
+    table.add_column("Pieces", justify="right", style="green")
+    table.add_column("Weight (Kgs)", justify="right", style="bold green")
+    table.add_column("Flight No", style="bold cyan", justify="center")
+    table.add_column("Flight Date", style="white", justify="center")
+    table.add_column("Route", style="bold magenta", justify="center")
+    table.add_column("ULD / Remarks", style="white")
+    table.add_column("State", justify="center")
+
+    if not status_history:
+        console.print("[dim yellow]No status history records available.[/dim yellow]")
+        return
+
+    for item in status_history:
+        badge = "[bold green]LATEST[/bold green]" if item.is_latest else "[dim]Historical[/dim]"
+        pcs_txt = str(item.pieces) if item.pieces is not None else "---"
+        sector = f"{item.origin} ➔ {item.destination}" if (item.origin and item.destination) else "---"
+        table.add_row(
+            item.station,
+            item.milestone,
+            pcs_txt,
+            item.weight or "---",
+            item.flight_no or "---",
+            item.flight_date or "---",
+            sector,
+            item.uld_or_remarks or "---",
+            badge
+        )
+
+    console.print(table)
+
+
+def render_indigo_delivery_orders(delivery_orders):
+    """Render IndiGo CarGo Delivery Orders & Consignee details table."""
+    table = Table(title="[bold blue]📦 IndiGo CarGo - Delivery Orders & Release Details[/bold blue]", box=box.ROUNDED)
+    table.add_column("DO Number", style="bold white")
+    table.add_column("AWB Number", style="dim", justify="center")
+    table.add_column("Pieces", justify="right", style="green")
+    table.add_column("Weight (Kgs)", justify="right", style="bold green")
+    table.add_column("Flight Details", style="cyan")
+    table.add_column("Issued To (Consignee)", style="bold yellow")
+
+    if not delivery_orders:
+        return
+
+    for do in delivery_orders:
+        pcs_txt = str(do.pieces) if do.pieces is not None else "---"
+        table.add_row(
+            do.do_number,
+            do.awb_number,
+            pcs_txt,
+            do.weight or "---",
+            do.flight_details or "---",
+            do.issued_to or "---"
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo, Neos Air Cargo)"
+        description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo, Neos Air Cargo, IndiGo CarGo)"
     )
     parser.add_argument(
         "awb",
         nargs="+",
-        help="One or more AWB numbers (e.g. '703-13715800' Neos Air Cargo, '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        help="One or more AWB numbers (e.g. '312-9298-9396' IndiGo, '703-13715800' Neos Air Cargo, '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
     )
     parser.add_argument(
         "--carrier",
-        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "cargoflash", "egyptair", "neos", "wcs", "neosair", "parcels"],
+        choices=["auto", "airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "qatar", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels"],
         default="auto",
-        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157, 077, 703)",
+        help="Target carrier (default: auto-detected by AWB prefix 098, 020, 176, 229, 125, 932, 157, 077, 703, 312)",
     )
     parser.add_argument(
         "--view",
@@ -940,6 +1073,7 @@ def main():
     qatar_client = QatarCargoClient()
     cargoflash_client = CargoFlashClient()
     neos_client = NeosCargoClient()
+    indigo_client = IndigoCargoClient()
 
     lh_browser = LufthansaBrowserTracker()
     ek_browser = EmiratesBrowserTracker()
@@ -979,7 +1113,7 @@ def main():
                         res = kw_client.track(raw_awb)
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1010,7 +1144,7 @@ def main():
                         res = ek_client.track(raw_awb)
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1033,7 +1167,7 @@ def main():
                     res = lh_client.track(raw_awb)
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1053,7 +1187,7 @@ def main():
                     console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1072,7 +1206,7 @@ def main():
                     console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1092,7 +1226,7 @@ def main():
                     console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1112,7 +1246,7 @@ def main():
                     console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1131,7 +1265,7 @@ def main():
                     console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):
@@ -1141,13 +1275,35 @@ def main():
                     if args.view in ("all", "activity"):
                         render_neos_milestones(res.milestones)
 
+            elif carrier in ("indigo", "6e", "indigocargo"):
+                clean_serial = re.sub(r'[^\d]', '', raw_awb)[-8:]
+                screenshot = f"indigo_{clean_serial}.png" if args.browser else None
+                with console.status(f"[bold blue]Tracking IndiGo CarGo (6E) {raw_awb} via SmartKargo Portal...[/bold blue]"):
+                    res = indigo_client.track(raw_awb, screenshot_path=screenshot)
+
+                if args.browser and screenshot:
+                    console.print(f"[bold green]✔ Screenshot saved:[/bold green] {screenshot}")
+
+                if args.json:
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
+                else:
+                    console.print()
+                    if args.view in ("all", "overview"):
+                        render_indigo_overview(res.overview)
+                    if args.view in ("all", "tracking"):
+                        render_indigo_booking_info(res.booking_info)
+                    if args.view in ("all", "activity"):
+                        render_indigo_status_history(res.status_history)
+                    if args.view in ("all", "tracking", "activity"):
+                        render_indigo_delivery_orders(res.delivery_orders)
+
             else:
                 # Default to Air India
                 with console.status(f"[bold red]Fetching Air India Cargo tracking for {raw_awb}...[/bold red]"):
                     res = ai_client.track(raw_awb)
 
                 if args.json:
-                    results.append(res.dict())
+                    results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 else:
                     console.print()
                     if args.view in ("all", "overview"):

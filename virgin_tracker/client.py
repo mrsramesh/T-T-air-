@@ -131,7 +131,11 @@ class VirginCargoClient:
 
             # Step 1: Navigate to portal
             logger.info(f"Opening {VIRGIN_PORTAL_URL}...")
-            page.goto(VIRGIN_PORTAL_URL, wait_until="networkidle", timeout=self.timeout_ms)
+            try:
+                page.goto(VIRGIN_PORTAL_URL, wait_until="domcontentloaded", timeout=self.timeout_ms)
+            except Exception as e:
+                logger.warning(f"Initial navigation issue: {e}, retrying...")
+                page.goto(VIRGIN_PORTAL_URL, timeout=self.timeout_ms)
             page.wait_for_timeout(1000)
 
             # Step 2: Locate Doc. No. tag input field
