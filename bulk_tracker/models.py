@@ -55,6 +55,8 @@ class BulkTrackingSummary(BaseModel):
     total_delivered: int = Field(default=0)
     total_in_transit: int = Field(default=0)
     total_not_found: int = Field(default=0)
+    total_unreachable: int = Field(default=0)
+    total_skipped: int = Field(default=0)
     total_errors: int = Field(default=0)
     total_time_sec: float = Field(default=0.0)
     records: List[UnifiedTrackingRecord] = Field(default_factory=list)

@@ -24,6 +24,52 @@ CARRIER_PREFIXES = {
     "098": ("Air India Cargo", "AI"),
 }
 
+# Extended registry of global IATA airline prefixes for recognition and polite skipping
+KNOWN_GLOBAL_IATA_PREFIXES = {
+    "065": ("Saudi Arabian Airlines (Saudia Cargo)", "SV"),
+    "615": ("DHL Aviation / European Air Transport", "QY"),
+    "607": ("Etihad Cargo", "EY"),
+    "014": ("Air Canada Cargo", "AC"),
+    "016": ("United Airlines Cargo", "UA"),
+    "001": ("American Airlines Cargo", "AA"),
+    "006": ("Delta Cargo", "DL"),
+    "057": ("Air France Cargo", "AF"),
+    "074": ("KLM Cargo", "KL"),
+    "160": ("Cathay Pacific Cargo", "CX"),
+    "217": ("Thai Airways Cargo", "TG"),
+    "235": ("Turkish Airlines Cargo", "TK"),
+    "180": ("Korean Air Cargo", "KE"),
+    "618": ("Singapore Airlines Cargo", "SQ"),
+    "081": ("Qantas Freight", "QF"),
+    "205": ("All Nippon Airways (ANA Cargo)", "NH"),
+    "131": ("Japan Airlines (JAL Cargo)", "JL"),
+    "288": ("Air Hong Kong", "LD"),
+    "406": ("UPS Air Cargo", "5X"),
+    "023": ("FedEx Express", "FX"),
+    "042": ("TAP Air Portugal", "TP"),
+    "043": ("Dragonair", "KA"),
+    "072": ("Gulf Air", "GF"),
+    "075": ("Iberia Cargo", "IB"),
+    "080": ("LOT Polish Airlines", "LO"),
+    "082": ("Brussels Airlines", "SN"),
+    "083": ("South African Airways", "SA"),
+    "096": ("Iran Air", "IR"),
+    "105": ("Finnair Cargo", "AY"),
+    "114": ("EL AL Israel Airlines", "LY"),
+    "117": ("Scandinavian Airlines (SAS)", "SK"),
+    "124": ("Air Algerie", "AH"),
+    "139": ("Aeromexico Cargo", "AM"),
+    "147": ("Royal Air Maroc", "AT"),
+    "230": ("Copa Airlines", "CM"),
+    "232": ("Malaysia Airlines Cargo", "MH"),
+    "423": ("AirBridgeCargo", "RU"),
+    "603": ("SriLankan Airlines", "UL"),
+    "724": ("Swiss WorldCargo", "LX"),
+    "729": ("Avianca Cargo", "AV"),
+    "784": ("China Southern Cargo", "CZ"),
+    "999": ("Air China Cargo", "CA"),
+}
+
 # Regex for common AWB shapes:
 # - 11 digits: '312-92989396', '312 92989396', '31292989396', '312-9298-9396'
 # - 8 digits serial: '92989396', '13715800'

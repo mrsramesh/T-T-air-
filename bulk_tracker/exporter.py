@@ -35,6 +35,8 @@ class ExcelReportExporter:
         "BOOKED": ("E1EFFE", "1E429F"),        # Soft blue
         "ACCEPTED": ("E1EFFE", "1E429F"),      # Soft blue
         "NOT_FOUND": ("FFEDD5", "9A3412"),     # Soft orange
+        "UNREACHABLE": ("FEE2E2", "991B1B"),   # Soft red / unreachable
+        "SKIPPED": ("F3F4F6", "4B5563"),       # Soft gray / skipped
         "ERROR": ("FDE8E8", "9B1C1C"),         # Soft red
     }
 
@@ -163,7 +165,10 @@ class ExcelReportExporter:
         total_req = len(records)
         deliv = sum(1 for r in records if r.status == "DELIVERED")
         transit = sum(1 for r in records if r.status in ("IN_TRANSIT", "DEPARTED", "ARRIVED", "BOOKED", "ACCEPTED"))
-        errs = sum(1 for r in records if r.status in ("ERROR", "NOT_FOUND"))
+        not_found = sum(1 for r in records if r.status == "NOT_FOUND")
+        unreachable = sum(1 for r in records if r.status == "UNREACHABLE")
+        skipped = sum(1 for r in records if r.status == "SKIPPED")
+        errs = sum(1 for r in records if r.status == "ERROR")
         tot_time = round(sum(r.execution_time_sec for r in records), 2)
 
         summary_rows = [
@@ -171,7 +176,10 @@ class ExcelReportExporter:
             ("Total Shipments Tracked", total_req),
             ("Delivered (POD)", deliv),
             ("In Transit / Active", transit),
-            ("Not Found / Errors", errs),
+            ("Not Found in System", not_found),
+            ("Unreachable Portals / Timeouts", unreachable),
+            ("Skipped (Unsupported IATA Prefixes)", skipped),
+            ("Technical Errors", errs),
             ("Total Processing Time (s)", f"{tot_time}s"),
             ("Average Time per AWB", f"{round(tot_time / total_req, 2)}s" if total_req else "0s"),
             ("Report Generated At", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),

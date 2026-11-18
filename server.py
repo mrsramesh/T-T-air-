@@ -284,7 +284,7 @@ def export_csv_report(payload: ExportPayload):
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def web_dashboard():
-    """Enterprise Web Dashboard for Multi-Carrier Cargo Tracking (Single & Bulk Engine)."""
+    """Enterprise Web Dashboard for Multi-Carrier Cargo Tracking (Single & Bulk Engine with Live Terminal Logs)."""
     return """
 <!DOCTYPE html>
 <html lang="en">
@@ -292,7 +292,7 @@ def web_dashboard():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Air Cargo Tracking & Bulk Engine</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-lh: #05164d;
@@ -309,28 +309,28 @@ def web_dashboard():
             --success: #16a34a;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background: var(--bg); color: var(--text-main); padding: 2rem 1rem; }
-        .container { max-width: 1140px; margin: 0 auto; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+        body { background: var(--bg); color: var(--text-main); padding: 1.5rem 1rem; }
+        .container { max-width: 1180px; margin: 0 auto; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; }
         .logo-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .badge-6e { background: #002d62; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #1e40af; }
-        .badge-no { background: #991b1b; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #7f1d1d; }
-        .badge-ms { background: #002d62; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #1e40af; }
-        .badge-qr { background: #5c0632; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #8a0c4d; }
-        .badge-vs { background: #e10a0a; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #7c0404; }
-        .badge-ba { background: #00205b; color: #ffffff; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #eb2226; }
-        .badge-kw { background: var(--primary-kw); color: #bae6fd; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #0284c7; }
-        .badge-ek { background: var(--primary-ek); color: #fef08a; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; border: 1px solid #dc2626; }
-        .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; }
-        .badge-ai { background: var(--primary-ai); color: white; padding: 4px 9px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; }
+        .badge-6e { background: #002d62; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #1e40af; }
+        .badge-no { background: #991b1b; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #7f1d1d; }
+        .badge-ms { background: #002d62; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #1e40af; }
+        .badge-qr { background: #5c0632; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #8a0c4d; }
+        .badge-vs { background: #e10a0a; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #7c0404; }
+        .badge-ba { background: #00205b; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #eb2226; }
+        .badge-kw { background: var(--primary-kw); color: #bae6fd; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #0284c7; }
+        .badge-ek { background: var(--primary-ek); color: #fef08a; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #dc2626; }
+        .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .badge-ai { background: var(--primary-ai); color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
         .title { font-size: 1.35rem; font-weight: 800; color: #1e293b; margin-left: 6px; }
 
         /* Mode Switcher */
-        .mode-switch-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
-        .mode-switch { display: flex; gap: 6px; background: #e2e8f0; padding: 4px; border-radius: 10px; width: fit-content; }
-        .mode-btn { border: none; background: transparent; padding: 9px 20px; border-radius: 8px; font-weight: 700; font-size: 0.92rem; color: #475569; cursor: pointer; transition: all 0.2s; }
-        .mode-btn.active { background: #ffffff; color: #0f172a; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-        .mode-btn:hover:not(.active) { color: #1e293b; background: rgba(255,255,255,0.4); }
+        .mode-switch-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px; background: white; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+        .mode-switch { display: flex; gap: 8px; background: #f1f5f9; padding: 4px; border-radius: 10px; }
+        .mode-btn { border: none; background: transparent; padding: 9px 20px; border-radius: 8px; font-weight: 700; font-size: 0.92rem; color: #475569; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .mode-btn.active { background: #2563eb; color: #ffffff; box-shadow: 0 2px 4px rgba(37,99,235,0.25); }
+        .mode-btn:hover:not(.active) { color: #0f172a; background: #e2e8f0; }
 
         /* Single Tracker Styles */
         .search-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
@@ -343,7 +343,7 @@ def web_dashboard():
         .quick-links { margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .quick-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #334155; font-family: monospace; font-size: 0.82rem; }
         .quick-btn:hover { background: #e2e8f0; }
-        .result-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; }
+        .result-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; margin-bottom: 1.5rem; }
         .card-top { padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .awb-num { font-size: 1.4rem; font-weight: 700; }
         .status-pill { padding: 5px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
@@ -374,7 +374,7 @@ def web_dashboard():
         .subtabs { display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
         .subtab-btn { border: 1px solid var(--border); background: #f8fafc; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: #475569; transition: all 0.2s; }
         .subtab-btn.active { background: #2563eb; color: #ffffff; border-color: #2563eb; }
-        .bulk-textarea { width: 100%; min-height: 125px; padding: 0.85rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; font-size: 0.92rem; line-height: 1.5; outline: none; resize: vertical; }
+        .bulk-textarea { width: 100%; min-height: 140px; padding: 0.85rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace; font-size: 0.92rem; line-height: 1.5; outline: none; resize: vertical; }
         .bulk-textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         .drop-zone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2.2rem 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; transition: all 0.2s; }
         .drop-zone:hover, .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; }
@@ -393,23 +393,43 @@ def web_dashboard():
         button.btn-bulk-track:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* Progress Bar */
-        .progress-box { margin-bottom: 1.5rem; display: none; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+        .progress-box { margin-bottom: 1.25rem; display: none; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
         .progress-head { display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; color: #334155; margin-bottom: 8px; }
         .progress-bar-wrap { width: 100%; height: 10px; background: #f1f5f9; border-radius: 9999px; overflow: hidden; }
         .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2563eb, #38bdf8); transition: width 0.3s; }
 
+        /* Live Terminal / Logging Console */
+        .terminal-card { background: #0f172a; border-radius: 12px; border: 1px solid #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); overflow: hidden; margin-bottom: 1.5rem; }
+        .terminal-head { background: #1e293b; padding: 0.6rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .terminal-title { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; display: inline-block; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .terminal-actions { display: flex; gap: 6px; }
+        .terminal-btn { background: #334155; color: #cbd5e1; border: none; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+        .terminal-btn:hover { background: #475569; color: white; }
+        .terminal-body { padding: 0.85rem 1rem; max-height: 190px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.55; color: #e2e8f0; }
+        .log-line { margin-bottom: 2px; }
+        .log-ts { color: #64748b; margin-right: 6px; }
+        .log-info { color: #38bdf8; }
+        .log-success { color: #4ade80; }
+        .log-warning { color: #facc15; }
+        .log-error { color: #f87171; }
+        .log-skipped { color: #94a3b8; }
+
         /* KPI Cards */
-        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
-        .kpi-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .kpi-card .m-val { font-size: 1.55rem; font-weight: 800; color: #0f172a; }
-        .kpi-card .m-lbl { font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.4px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+        .kpi-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+        .kpi-card .m-val { font-size: 1.45rem; font-weight: 800; color: #0f172a; }
+        .kpi-card .m-lbl { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.3px; }
         .kpi-card.kpi-success .m-val { color: #16a34a; }
         .kpi-card.kpi-failed .m-val { color: #dc2626; }
         .kpi-card.kpi-transit .m-val { color: #2563eb; }
+        .kpi-card.kpi-unreachable .m-val { color: #b91c1c; }
+        .kpi-card.kpi-skipped .m-val { color: #64748b; }
 
         /* Bulk Table Card */
         .bulk-results-card { background: white; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; margin-bottom: 2rem; }
-        .bulk-toolbar { padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .bulk-toolbar { padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
         .filter-group { display: flex; gap: 10px; align-items: center; flex: 1; min-width: 280px; }
         .filter-input { flex: 1; padding: 0.6rem 0.85rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.88rem; outline: none; }
         .filter-input:focus { border-color: #2563eb; }
@@ -423,16 +443,18 @@ def web_dashboard():
         .btn-inspect:hover { background: #e2e8f0; color: #0f172a; }
 
         /* Status Pills */
-        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+        .status-badge { display: inline-block; padding: 3px 9px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
         .st-DELIVERED { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
         .st-IN_TRANSIT, .st-DEPARTED { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
         .st-ARRIVED { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
         .st-BOOKED, .st-ACCEPTED { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
-        .st-NOT_FOUND { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .st-NOT_FOUND { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+        .st-UNREACHABLE { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
+        .st-SKIPPED { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
         .st-ERROR { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 
         /* Airline Pills */
-        .carrier-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; font-family: monospace; }
+        .carrier-tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; font-family: monospace; white-space: nowrap; }
         .ct-indigo { background: #eff6ff; color: #002d62; border: 1px solid #bfdbfe; }
         .ct-neos { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
         .ct-cargoflash { background: #eff6ff; color: #002d62; border: 1px solid #bfdbfe; }
@@ -443,6 +465,7 @@ def web_dashboard():
         .ct-emirates { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
         .ct-lufthansa { background: #eff6ff; color: #05164d; border: 1px solid #bfdbfe; }
         .ct-airindia { background: #fef2f2; color: #d71921; border: 1px solid #fecaca; }
+        .ct-other { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
         /* Modal Dialog */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; backdrop-filter: blur(2px); }
@@ -477,10 +500,14 @@ def web_dashboard():
         <!-- Mode Switcher (Single vs Bulk Engine) -->
         <div class="mode-switch-wrap">
             <div class="mode-switch">
-                <button id="btnModeSingle" class="mode-btn active" onclick="switchDashboardMode('single')">🔍 Single AWB Tracker</button>
-                <button id="btnModeBulk" class="mode-btn" onclick="switchDashboardMode('bulk')">⚡ Bulk & Multi-AWB Engine (Excel & CSV)</button>
+                <button id="btnModeSingle" class="mode-btn active" onclick="switchDashboardMode('single')">
+                    🔍 Single AWB Tracker
+                </button>
+                <button id="btnModeBulk" class="mode-btn" onclick="switchDashboardMode('bulk')">
+                    ⚡ Bulk & Multi-AWB Engine (Batch & Excel)
+                </button>
             </div>
-            <div style="font-size: 0.85rem; color: #64748b;">Enterprise 10-Carrier Concurrency & Anti-Bot Protection</div>
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 10-Carrier Tracking & Anti-Bot Protection</div>
         </div>
 
         <div class="error-msg" id="errorBox"></div>
@@ -502,24 +529,21 @@ def web_dashboard():
                         <option value="lufthansa">Lufthansa Cargo (020)</option>
                         <option value="airindia">Air India Cargo (098)</option>
                     </select>
-                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 312-9298-9396, 703-13715800, 077-59060002, 157-5366-1580, 932-78989514, 125-24128344, 229-18148900, 176-63116340, 020-04585280, 098-30244056)" value="312-9298-9396" />
+                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 077-59068973, 229-18148900, 020-03295493) or paste multiple AWBs to auto-track batch" value="077-59068973" />
                     <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
                 </div>
                 <div class="quick-links">
                     <span>Quick Samples:</span>
+                    <button class="quick-btn" onclick="setAwb('077-59068973', 'cargoflash')">077-59068973 (EgyptAir LON)</button>
+                    <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Delivered)</button>
+                    <button class="quick-btn" onclick="setAwb('229-17349544', 'kuwait')">229-17349544 (Kuwait Departed)</button>
+                    <button class="quick-btn" onclick="setAwb('098-32367930', 'airindia')">098-32367930 (Air India DXB)</button>
+                    <button class="quick-btn" onclick="setAwb('020-03295493', 'lufthansa')">020-03295493 (Lufthansa FRA)</button>
+                    <button class="quick-btn" onclick="setAwb('020-03742222', 'lufthansa')">020-03742222 (Lufthansa MIA)</button>
+                    <button class="quick-btn" onclick="setAwb('020-02198851', 'lufthansa')">020-02198851 (Lufthansa BCN)</button>
+                    <button class="quick-btn" onclick="setAwb('125-24128370', 'britishairways')">125-24128370 (BA JFK)</button>
                     <button class="quick-btn" onclick="setAwb('312-9298-9396', 'indigo')">312-9298-9396 (IndiGo BKK)</button>
                     <button class="quick-btn" onclick="setAwb('703-13715800', 'neos')">703-13715800 (Neos KWI)</button>
-                    <button class="quick-btn" onclick="setAwb('703-13715332', 'neos')">703-13715332 (Neos JED)</button>
-                    <button class="quick-btn" onclick="setAwb('077-59060002', 'cargoflash')">077-59060002 (EgyptAir LON)</button>
-                    <button class="quick-btn" onclick="setAwb('077-59060945', 'cargoflash')">077-59060945 (EgyptAir ORD)</button>
-                    <button class="quick-btn" onclick="setAwb('157-5366-1580', 'qatar')">157-5366-1580 (Qatar Airways)</button>
-                    <button class="quick-btn" onclick="setAwb('932-78989514', 'virgin')">932-78989514 (Virgin Atlantic)</button>
-                    <button class="quick-btn" onclick="setAwb('125-24128344', 'britishairways')">125-24128344 (British Airways)</button>
-                    <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Valid)</button>
-                    <button class="quick-btn" onclick="setAwb('229-17349566', 'kuwait')">229-17349566 (Kuwait Not Found)</button>
-                    <button class="quick-btn" onclick="setAwb('176-63116340', 'emirates')">176-63116340 (Emirates)</button>
-                    <button class="quick-btn" onclick="setAwb('020-04585280', 'lufthansa')">020-04585280 (Lufthansa)</button>
-                    <button class="quick-btn" onclick="setAwb('098-30244056', 'airindia')">098-30244056 (Air India)</button>
                 </div>
             </div>
 
@@ -609,7 +633,7 @@ def web_dashboard():
 
                 <!-- Panel A: Paste Area -->
                 <div id="panelPasteArea">
-                    <textarea id="bulkTextarea" class="bulk-textarea" placeholder="Paste multiple AWB numbers here (separated by newlines, commas, spaces, semicolons, tabs, or pipes).&#10;Example:&#10;312-9298-9396, 703-13715800, 077-59060002&#10;157-5366-1580, 125-24128344, 229-18148900"></textarea>
+                    <textarea id="bulkTextarea" class="bulk-textarea" placeholder="Paste multiple AWB numbers here (separated by newlines, commas, spaces, semicolons, tabs, or pipes).&#10;Example:&#10;077-59068973&#10;229-18148900&#10;932-78969444&#10;020-03295493&#10;065-38891834&#10;125-24128370"></textarea>
                 </div>
 
                 <!-- Panel B: Upload Area -->
@@ -629,7 +653,8 @@ def web_dashboard():
                 <!-- Bulk Controls -->
                 <div class="bulk-ctrls">
                     <div class="bulk-quick">
-                        <button class="quick-btn" onclick="fillBulkSample()">⚡ Fill 8-Airline Sample Batch</button>
+                        <button class="quick-btn" onclick="fillUserTestAwbs()">⚡ Fill User's 11 Mixed AWBs (Live Test Batch)</button>
+                        <button class="quick-btn" onclick="fillBulkSample()">📋 Fill 8-Airline Sample Batch</button>
                         <button class="quick-btn" onclick="clearBulkInput()">🗑 Clear</button>
                     </div>
                     <div class="bulk-run-wrap">
@@ -658,6 +683,23 @@ def web_dashboard():
                 </div>
             </div>
 
+            <!-- Real-Time Terminal / Activity Logging Console -->
+            <div class="terminal-card" id="terminalCard">
+                <div class="terminal-head">
+                    <div class="terminal-title">
+                        <span class="live-dot"></span>
+                        <span>LIVE TRACKING MONITOR & OBSERVABILITY CONSOLE</span>
+                    </div>
+                    <div class="terminal-actions">
+                        <button class="terminal-btn" onclick="copyTerminalLogs()">📋 Copy Logs</button>
+                        <button class="terminal-btn" onclick="clearTerminalLogs()">🗑 Clear</button>
+                    </div>
+                </div>
+                <div class="terminal-body" id="terminalLogs">
+                    <div class="log-line"><span class="log-ts">[Ready]</span> <span class="log-info">System initialized. Awaiting tracking requests across 10 global airline networks...</span></div>
+                </div>
+            </div>
+
             <!-- Bulk KPI Metrics Row -->
             <div class="kpi-row" id="bulkKpiRow" style="display: none;">
                 <div class="kpi-card">
@@ -665,28 +707,28 @@ def web_dashboard():
                     <div class="m-val" id="kpiTotal">0</div>
                 </div>
                 <div class="kpi-card kpi-success">
-                    <div class="m-lbl">Succeeded</div>
-                    <div class="m-val" id="kpiSuccess">0</div>
-                </div>
-                <div class="kpi-card kpi-failed">
-                    <div class="m-lbl">Failed / Not Found</div>
-                    <div class="m-val" id="kpiFailed">0</div>
-                </div>
-                <div class="kpi-card kpi-success">
-                    <div class="m-lbl">Delivered</div>
+                    <div class="m-lbl">Delivered (POD)</div>
                     <div class="m-val" id="kpiDelivered">0</div>
                 </div>
                 <div class="kpi-card kpi-transit">
-                    <div class="m-lbl">In-Transit / Departed</div>
+                    <div class="m-lbl">In-Transit / Dep</div>
                     <div class="m-val" id="kpiTransit">0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="m-lbl">Arrived</div>
                     <div class="m-val" id="kpiArrived">0</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="m-lbl">Booked / Accepted</div>
-                    <div class="m-val" id="kpiBooked">0</div>
+                <div class="kpi-card kpi-failed">
+                    <div class="m-lbl">Not Found</div>
+                    <div class="m-val" id="kpiFailed">0</div>
+                </div>
+                <div class="kpi-card kpi-unreachable">
+                    <div class="m-lbl">🔌 Unreachable</div>
+                    <div class="m-val" id="kpiUnreachable">0</div>
+                </div>
+                <div class="kpi-card kpi-skipped">
+                    <div class="m-lbl">⏭ Skipped (Prefix)</div>
+                    <div class="m-val" id="kpiSkipped">0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="m-lbl">Elapsed Time</div>
@@ -698,16 +740,18 @@ def web_dashboard():
             <div class="bulk-results-card" id="bulkResultsCard">
                 <div class="bulk-toolbar">
                     <div class="filter-group">
-                        <input type="text" id="bulkSearchInput" class="filter-input" placeholder="🔍 Search AWB, Airline, Station (e.g. BOM, BKK, KWI), Flight..." oninput="renderBulkTable()" />
+                        <input type="text" id="bulkSearchInput" class="filter-input" placeholder="🔍 Search AWB, Airline, Station (e.g. BOM, LHR, FRA, DXB), Flight..." oninput="renderBulkTable()" />
                         <select id="bulkStatusFilter" class="filter-select" onchange="renderBulkTable()">
                             <option value="ALL">All Statuses</option>
-                            <option value="DELIVERED">Delivered</option>
+                            <option value="DELIVERED">Delivered (POD)</option>
                             <option value="IN_TRANSIT">In Transit</option>
                             <option value="ARRIVED">Arrived</option>
                             <option value="DEPARTED">Departed</option>
                             <option value="BOOKED">Booked</option>
                             <option value="ACCEPTED">Accepted</option>
                             <option value="NOT_FOUND">Not Found</option>
+                            <option value="UNREACHABLE">Unreachable</option>
+                            <option value="SKIPPED">Skipped (Unsupported Prefix)</option>
                             <option value="ERROR">Error</option>
                         </select>
                     </div>
@@ -733,7 +777,7 @@ def web_dashboard():
                                 <th>Pieces / Weight</th>
                                 <th>Flight(s)</th>
                                 <th>Latest Activity</th>
-                                <th>Timestamp</th>
+                                <th>Elapsed</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -771,27 +815,12 @@ def web_dashboard():
                         <div class="m-val" id="modalFlight">---</div>
                     </div>
                     <div>
-                        <div class="m-lbl">Event Timestamp</div>
-                        <div class="m-val" id="modalEventTime" style="font-size: 0.95rem;">---</div>
+                        <div class="m-lbl">Execution Time</div>
+                        <div class="m-val" id="modalExecTime" style="font-size: 0.95rem;">---</div>
                     </div>
                 </div>
 
                 <div class="banner" id="modalLatestActivity" style="border-radius: 8px; margin-bottom: 1.25rem;">Latest Activity</div>
-
-                <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: #1e293b;">Milestones Timeline</div>
-                <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.25rem;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date & Time</th>
-                                <th>Code</th>
-                                <th>Description</th>
-                                <th>Station</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modalMilestonesBody"></tbody>
-                    </table>
-                </div>
 
                 <details style="font-size: 0.85rem; color: #64748b; background: #f8fafc; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border);">
                     <summary style="cursor: pointer; font-weight: 600;">View Raw Payload JSON</summary>
@@ -802,6 +831,31 @@ def web_dashboard():
     </div>
 
     <script>
+        // Terminal Logging System
+        function logTerminal(message, type = 'info') {
+            const body = document.getElementById('terminalLogs');
+            if (!body) return;
+            const now = new Date().toTimeString().split(' ')[0];
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            div.innerHTML = `<span class="log-ts">[${now}]</span> <span class="log-${type}">${message}</span>`;
+            body.appendChild(div);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function clearTerminalLogs() {
+            const body = document.getElementById('terminalLogs');
+            if (body) body.innerHTML = '<div class="log-line"><span class="log-ts">[Cleared]</span> <span class="log-info">Console reset.</span></div>';
+        }
+
+        function copyTerminalLogs() {
+            const body = document.getElementById('terminalLogs');
+            if (!body) return;
+            navigator.clipboard.writeText(body.innerText).then(() => {
+                alert('Logs copied to clipboard!');
+            });
+        }
+
         // Current Bulk State
         let currentBulkData = null;
         let currentBulkRecords = [];
@@ -817,11 +871,13 @@ def web_dashboard():
                 btnBulk.classList.add('active');
                 secSingle.style.display = 'none';
                 secBulk.style.display = 'block';
+                logTerminal('Switched view to Bulk & Multi-AWB Engine.', 'info');
             } else {
                 btnBulk.classList.remove('active');
                 btnSingle.classList.add('active');
                 secBulk.style.display = 'none';
                 secSingle.style.display = 'block';
+                logTerminal('Switched view to Single AWB Tracker.', 'info');
             }
         }
 
@@ -844,6 +900,25 @@ def web_dashboard():
             }
         }
 
+        function fillUserTestAwbs() {
+            const userAwbs = [
+                "077-59068973",
+                "229-18148900",
+                "932-78969444",
+                "229-17349544",
+                "098-32367930",
+                "020-03295493",
+                "020-03742222",
+                "020-02198851",
+                "065-38891834",
+                "125-24128370",
+                "615-63964714"
+            ];
+            document.getElementById('bulkTextarea').value = userAwbs.join('\n');
+            switchBulkTab('paste');
+            logTerminal(`Loaded 11 mixed test AWBs (includes supported carriers + Saudia 065 & DHL 615).`, 'info');
+        }
+
         function fillBulkSample() {
             const samples = [
                 "312-9298-9396", // IndiGo
@@ -857,12 +932,14 @@ def web_dashboard():
             ];
             document.getElementById('bulkTextarea').value = samples.join('\n');
             switchBulkTab('paste');
+            logTerminal(`Loaded 8 sample AWBs into paste area.`, 'info');
         }
 
         function clearBulkInput() {
             document.getElementById('bulkTextarea').value = '';
             document.getElementById('fileUploadInput').value = '';
             document.getElementById('fileBadge').style.display = 'none';
+            logTerminal('Cleared input fields.', 'info');
         }
 
         function handleFileSelect(input) {
@@ -870,6 +947,7 @@ def web_dashboard():
                 const file = input.files[0];
                 document.getElementById('fileBadge').style.display = 'inline-flex';
                 document.getElementById('fileNameSpan').innerText = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                logTerminal(`Selected spreadsheet: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`, 'info');
             }
         }
 
@@ -888,8 +966,10 @@ def web_dashboard():
             btnRun.disabled = true;
             btnRun.innerHTML = '<span>Tracking In Progress...</span>';
             progressBox.style.display = 'block';
-            progressBar.style.width = '35%';
+            progressBar.style.width = '20%';
             progressText.innerText = `Dispatching multi-airline tracking queries (Concurrency: ${workers} workers)...`;
+
+            logTerminal(`🚀 Dispatched bulk tracking request with ${workers} parallel workers...`, 'info');
 
             try {
                 let response;
@@ -900,6 +980,7 @@ def web_dashboard():
                     }
                     const formData = new FormData();
                     formData.append('file', fileInput.files[0]);
+                    logTerminal(`Uploading and scanning sheets in ${fileInput.files[0].name}...`, 'info');
                     response = await fetch(`/api/v1/track/upload?workers=${workers}`, {
                         method: 'POST',
                         body: formData
@@ -907,8 +988,9 @@ def web_dashboard():
                 } else {
                     const text = document.getElementById('bulkTextarea').value.trim();
                     if (!text) {
-                        throw new Error("Please paste at least one AWB number into the box or click 'Fill Sample Batch'.");
+                        throw new Error("Please paste at least one AWB number into the box or click 'Fill User's 11 Mixed AWBs'.");
                     }
+                    logTerminal(`Parsing and dispatching raw AWB text block...`, 'info');
                     response = await fetch(`/api/v1/track/bulk`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -916,8 +998,8 @@ def web_dashboard():
                     });
                 }
 
-                progressBar.style.width = '75%';
-                progressText.innerText = 'Analyzing and standardizing carrier responses...';
+                progressBar.style.width = '70%';
+                progressText.innerText = 'Standardizing multi-carrier records and computing KPIs...';
 
                 if (!response.ok) {
                     const errData = await response.json();
@@ -929,17 +1011,34 @@ def web_dashboard():
                 currentBulkRecords = data.records || [];
 
                 progressBar.style.width = '100%';
-                progressText.innerText = `Complete! Tracked ${data.total_awbs} AWBs in ${data.duration_seconds}s (${data.success_count} succeeded, ${data.failure_count} failed).`;
+                progressText.innerText = `Complete! Tracked ${data.total_requested} AWBs in ${data.total_time_sec}s.`;
+
+                // Log every record to terminal
+                currentBulkRecords.forEach(r => {
+                    if (r.status === 'DELIVERED') {
+                        logTerminal(`✔ [DELIVERED] ${r.awb} (${r.carrier_name}) | Route: ${r.route} | Detail: ${r.status_detail}`, 'success');
+                    } else if (r.status === 'SKIPPED') {
+                        logTerminal(`⏭ [SKIPPED] ${r.awb} (${r.carrier_name}) | ${r.status_detail}`, 'skipped');
+                    } else if (r.status === 'NOT_FOUND') {
+                        logTerminal(`✖ [NOT_FOUND] ${r.awb} (${r.carrier_name}) | ${r.status_detail}`, 'warning');
+                    } else if (r.status === 'UNREACHABLE') {
+                        logTerminal(`🔌 [UNREACHABLE] ${r.awb} (${r.carrier_name}) | ${r.error_message || r.status_detail}`, 'error');
+                    } else {
+                        logTerminal(`⚡ [${r.status}] ${r.awb} (${r.carrier_name}) | Route: ${r.route} | Detail: ${r.status_detail}`, 'info');
+                    }
+                });
+
+                logTerminal(`🏁 Batch finished in ${data.total_time_sec}s! Total: ${data.total_requested}, Delivered: ${data.total_delivered}, In-Transit: ${data.total_in_transit}, Skipped: ${data.total_skipped || 0}, Unreachable: ${data.total_unreachable || 0}`, 'success');
 
                 // Update KPI Metrics
-                document.getElementById('kpiTotal').innerText = data.total_awbs;
-                document.getElementById('kpiSuccess').innerText = data.success_count;
-                document.getElementById('kpiFailed').innerText = data.failure_count;
-                document.getElementById('kpiDelivered').innerText = (data.status_breakdown && data.status_breakdown.DELIVERED) || 0;
-                document.getElementById('kpiTransit').innerText = ((data.status_breakdown && data.status_breakdown.IN_TRANSIT) || 0) + ((data.status_breakdown && data.status_breakdown.DEPARTED) || 0);
-                document.getElementById('kpiArrived').innerText = (data.status_breakdown && data.status_breakdown.ARRIVED) || 0;
-                document.getElementById('kpiBooked').innerText = ((data.status_breakdown && data.status_breakdown.BOOKED) || 0) + ((data.status_breakdown && data.status_breakdown.ACCEPTED) || 0);
-                document.getElementById('kpiDuration').innerText = `${data.duration_seconds}s`;
+                document.getElementById('kpiTotal').innerText = data.total_requested;
+                document.getElementById('kpiDelivered').innerText = data.total_delivered || 0;
+                document.getElementById('kpiTransit').innerText = data.total_in_transit || 0;
+                document.getElementById('kpiArrived').innerText = currentBulkRecords.filter(r => r.status === 'ARRIVED').length;
+                document.getElementById('kpiFailed').innerText = data.total_not_found || 0;
+                document.getElementById('kpiUnreachable').innerText = data.total_unreachable || 0;
+                document.getElementById('kpiSkipped').innerText = data.total_skipped || 0;
+                document.getElementById('kpiDuration').innerText = `${data.total_time_sec}s`;
 
                 // Show KPI and Results
                 kpiRow.style.display = 'grid';
@@ -953,6 +1052,7 @@ def web_dashboard():
                 errorBox.innerText = `Error: ${err.message}`;
                 errorBox.style.display = 'block';
                 progressBox.style.display = 'none';
+                logTerminal(`❌ Execution error: ${err.message}`, 'error');
             } finally {
                 btnRun.disabled = false;
                 btnRun.innerHTML = '<span>🚀 Track All AWBs</span>';
@@ -971,7 +1071,7 @@ def web_dashboard():
                     return false;
                 }
                 if (searchFilter) {
-                    const combined = `${r.awb} ${r.carrier} ${r.origin} ${r.destination} ${r.flight_numbers} ${r.latest_activity} ${r.status}`.toLowerCase();
+                    const combined = `${r.awb} ${r.carrier_name} ${r.origin} ${r.destination} ${r.flight_details} ${r.latest_activity} ${r.status}`.toLowerCase();
                     return combined.includes(searchFilter);
                 }
                 return true;
@@ -985,21 +1085,38 @@ def web_dashboard():
             filtered.forEach((r, idx) => {
                 const tr = document.createElement('tr');
                 const stClass = `st-${r.status}`;
-                const ctClass = `ct-${r.carrier_code.toLowerCase()}`;
-                const flightBadge = r.flight_numbers ? `<span class="badge-ev">${r.flight_numbers}</span>` : '<span style="color:#94a3b8">N/A</span>';
-                const route = (r.origin || r.destination) ? `<strong>${r.origin || '---'}</strong> ➔ <strong>${r.destination || '---'}</strong>` : '<span style="color:#94a3b8">N/A</span>';
-                const weightPcs = `${r.pieces ? r.pieces + ' pcs' : ''} ${r.weight_kg ? '/ ' + r.weight_kg + ' KG' : ''}`.trim() || '<span style="color:#94a3b8">N/A</span>';
+                let ctClass = 'ct-other';
+                if (r.carrier_prefix === '312') ctClass = 'ct-indigo';
+                else if (r.carrier_prefix === '703') ctClass = 'ct-neos';
+                else if (r.carrier_prefix === '077') ctClass = 'ct-cargoflash';
+                else if (r.carrier_prefix === '157') ctClass = 'ct-qatar';
+                else if (r.carrier_prefix === '932') ctClass = 'ct-virgin';
+                else if (r.carrier_prefix === '125') ctClass = 'ct-britishairways';
+                else if (r.carrier_prefix === '229') ctClass = 'ct-kuwait';
+                else if (r.carrier_prefix === '176') ctClass = 'ct-emirates';
+                else if (r.carrier_prefix === '020') ctClass = 'ct-lufthansa';
+                else if (r.carrier_prefix === '098') ctClass = 'ct-airindia';
+
+                const flightBadge = r.flight_details ? `<span class="badge-ev">${r.flight_details}</span>` : '<span style="color:#94a3b8">N/A</span>';
+                const route = (r.origin !== '---' || r.destination !== '---') ? `<strong>${r.origin}</strong> ➔ <strong>${r.destination}</strong>` : '<span style="color:#94a3b8">---</span>';
+                const weightPcs = `${r.pieces ? r.pieces + ' pcs' : ''} ${r.weight ? '/ ' + r.weight : ''}`.trim() || '<span style="color:#94a3b8">---</span>';
+
+                let statusIcon = '';
+                if (r.status === 'DELIVERED') statusIcon = '✔ ';
+                else if (r.status === 'SKIPPED') statusIcon = '⏭ ';
+                else if (r.status === 'UNREACHABLE') statusIcon = '🔌 ';
+                else if (r.status === 'NOT_FOUND') statusIcon = '✖ ';
 
                 tr.innerHTML = `
                     <td style="color: #64748b; font-weight: 600;">${idx + 1}</td>
                     <td><strong style="font-family: monospace; font-size: 0.95rem;">${r.awb}</strong></td>
-                    <td><span class="carrier-tag ${ctClass}">${r.carrier}</span></td>
-                    <td><span class="status-badge ${stClass}">${r.status}</span></td>
+                    <td><span class="carrier-tag ${ctClass}">${r.carrier_name}</span></td>
+                    <td><span class="status-badge ${stClass}">${statusIcon}${r.status}</span></td>
                     <td>${route}</td>
                     <td>${weightPcs}</td>
                     <td>${flightBadge}</td>
-                    <td style="max-width: 260px; font-size: 0.85rem;" title="${r.latest_activity}">${r.latest_activity || '---'}</td>
-                    <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">${r.latest_event_time || '---'}</td>
+                    <td style="max-width: 250px; font-size: 0.85rem;" title="${r.latest_activity || r.status_detail}">${r.latest_activity || r.status_detail || '---'}</td>
+                    <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">${r.execution_time_sec}s</td>
                     <td>
                         <button class="btn-inspect" onclick="inspectShipment('${r.awb}')">👁 Inspect</button>
                     </td>
@@ -1014,6 +1131,7 @@ def web_dashboard():
                 return;
             }
             try {
+                logTerminal('Generating executive Excel workbook (.xlsx)...', 'info');
                 const res = await fetch('/api/v1/export/excel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1028,8 +1146,10 @@ def web_dashboard():
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                logTerminal('✔ Excel report downloaded successfully.', 'success');
             } catch (e) {
                 alert(`Export error: ${e.message}`);
+                logTerminal(`❌ Excel export error: ${e.message}`, 'error');
             }
         }
 
@@ -1039,6 +1159,7 @@ def web_dashboard():
                 return;
             }
             try {
+                logTerminal('Generating CSV export...', 'info');
                 const res = await fetch('/api/v1/export/csv', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1053,8 +1174,10 @@ def web_dashboard():
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                logTerminal('✔ CSV report downloaded successfully.', 'success');
             } catch (e) {
                 alert(`Export error: ${e.message}`);
+                logTerminal(`❌ CSV export error: ${e.message}`, 'error');
             }
         }
 
@@ -1063,36 +1186,17 @@ def web_dashboard():
             if (!record) return;
 
             document.getElementById('modalAwbTitle').innerText = record.awb;
-            document.getElementById('modalCarrierTag').innerText = record.carrier;
-            document.getElementById('modalCarrierTag').className = `carrier-tag ct-${record.carrier_code.toLowerCase()}`;
+            document.getElementById('modalCarrierTag').innerText = record.carrier_name;
+            document.getElementById('modalCarrierTag').className = `carrier-tag ct-other`;
             document.getElementById('modalStatusBadge').innerText = record.status;
             document.getElementById('modalStatusBadge').className = `status-badge st-${record.status}`;
 
             document.getElementById('modalRoute').innerText = `${record.origin || 'N/A'} ➔ ${record.destination || 'N/A'}`;
-            document.getElementById('modalPcsWeight').innerText = `${record.pieces || '---'} pcs / ${record.weight_kg || '---'} KG`;
-            document.getElementById('modalFlight').innerText = record.flight_numbers || 'N/A';
-            document.getElementById('modalLatestActivity').innerText = record.latest_activity || 'N/A';
-            document.getElementById('modalEventTime').innerText = record.latest_event_time || 'N/A';
-            document.getElementById('modalRawData').innerText = JSON.stringify(record.raw_payload || {}, null, 2);
-
-            // Milestones
-            const mBody = document.getElementById('modalMilestonesBody');
-            mBody.innerHTML = '';
-            const milestones = record.milestones || [];
-            if (milestones.length === 0) {
-                mBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 1rem;">No milestone events recorded.</td></tr>`;
-            } else {
-                milestones.forEach(m => {
-                    mBody.innerHTML += `
-                        <tr>
-                            <td style="font-size: 0.85rem; font-weight: 600;">${m.date_time || '---'}</td>
-                            <td><span class="badge-ev">${m.code || 'EV'}</span></td>
-                            <td style="font-size: 0.88rem;">${m.description || '---'}</td>
-                            <td><strong>${m.station || '---'}</strong></td>
-                        </tr>
-                    `;
-                });
-            }
+            document.getElementById('modalPcsWeight').innerText = `${record.pieces || '---'} pcs / ${record.weight || '---'}`;
+            document.getElementById('modalFlight').innerText = record.flight_details || 'N/A';
+            document.getElementById('modalExecTime').innerText = `${record.execution_time_sec}s`;
+            document.getElementById('modalLatestActivity').innerText = record.latest_activity || record.status_detail || 'N/A';
+            document.getElementById('modalRawData').innerText = JSON.stringify(record, null, 2);
 
             document.getElementById('shipmentModalOverlay').style.display = 'flex';
         }
@@ -1113,10 +1217,23 @@ def web_dashboard():
             trackAWB();
         }
 
-async function trackAWB() {
-            const awb = document.getElementById('awbInput').value.trim();
+        // Intercept trackAWB to auto-detect multiple AWBs entered in the search box
+        async function trackAWB() {
+            const awbRaw = document.getElementById('awbInput').value.trim();
             const carrier = document.getElementById('carrierSelect').value;
-            if (!awb) return;
+            if (!awbRaw) return;
+
+            // INTELLIGENT AUTO-ROUTING:
+            // If the user pasted multiple AWBs into the single search box (e.g. separated by spaces, commas, newlines):
+            const candidateTokens = awbRaw.split(/[\s,;\n\t|]+/).filter(t => t.length >= 7);
+            if (candidateTokens.length > 1) {
+                logTerminal(`⚡ Detected ${candidateTokens.length} AWBs in single input box. Auto-routing to Bulk & Multi-AWB Engine!`, 'warning');
+                switchDashboardMode('bulk');
+                document.getElementById('bulkTextarea').value = candidateTokens.join('\n');
+                switchBulkTab('paste');
+                runBulkTracking();
+                return;
+            }
 
             const errorBox = document.getElementById('errorBox');
             const loader = document.getElementById('loader');
@@ -1128,13 +1245,17 @@ async function trackAWB() {
             stationWrap.style.display = 'none';
             loader.style.display = 'block';
 
+            logTerminal(`Initiating single tracking for AWB: ${awbRaw} (Carrier: ${carrier})...`, 'info');
+
             try {
-                const res = await fetch(`/api/v1/track/${encodeURIComponent(awb)}?carrier=${carrier}`);
+                const res = await fetch(`/api/v1/track/${encodeURIComponent(awbRaw)}?carrier=${carrier}`);
                 const envelope = await res.json();
 
                 if (!res.ok) {
                     throw new Error(envelope.detail || 'Shipment tracking failed');
                 }
+
+                logTerminal(`✔ Successfully retrieved tracking details for ${awbRaw} (${envelope.carrier})`, 'success');
 
                 const cName = envelope.carrier;
                 const data = envelope.data;
@@ -1144,7 +1265,8 @@ async function trackAWB() {
 
                 const topBar = document.getElementById('cardTop');
 
-                if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
+                // Standard Single Tracker Population Logic
+if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     // IndiGo CarGo (SmartKargo)
                     topBar.style.background = '#eff6ff';
                     const isDelivered = (data.overview.current_status || '').toLowerCase().includes('delivered');
@@ -1729,21 +1851,6 @@ async function trackAWB() {
         }
 
         function switchTab(tab) {
-            const tabs = document.querySelectorAll('.tab-item');
-            tabs.forEach(t => t.classList.remove('active'));
-
-            if (tab === 'flights') {
-                tabs[0].classList.add('active');
-                document.getElementById('panelFlights').style.display = 'block';
-                document.getElementById('panelHistory').style.display = 'none';
-            } else {
-                tabs[1].classList.add('active');
-                document.getElementById('panelFlights').style.display = 'none';
-                document.getElementById('panelHistory').style.display = 'block';
-            }
-        }
-
-        function switchTab(tab) {
             const tabs = document.querySelectorAll('#singleTrackerSection .tab-item');
             tabs.forEach(t => t.classList.remove('active'));
 
@@ -1765,7 +1872,6 @@ async function trackAWB() {
 </body>
 </html>
     """
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)

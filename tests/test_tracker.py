@@ -544,6 +544,31 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(res_health.status_code, 200)
         self.assertEqual(len(res_health.json()["carriers"]), 10)
 
+    def test_unsupported_prefix_skipping(self):
+        tracker = BulkCargoTracker(max_global_workers=2)
+        # Test 065 (Saudia Cargo) and 615 (DHL Aviation)
+        rec1 = tracker.track_single("065-38891834")
+        self.assertEqual(rec1.status, "SKIPPED")
+        self.assertIn("Saudi Arabian Airlines", rec1.carrier_name)
+        self.assertIn("Skipped", rec1.status_detail)
+
+        rec2 = tracker.track_single("615-63964714")
+        self.assertEqual(rec2.status, "SKIPPED")
+        self.assertIn("DHL Aviation", rec2.carrier_name)
+        self.assertIn("Skipped", rec2.status_detail)
+
+    def test_unreachable_portal_flagging(self):
+        tracker = BulkCargoTracker(max_global_workers=1)
+        err_rec = CarrierDataNormalizer.create_error_record(
+            "077-59068973",
+            "Failed to resolve 'msres.cargoflash.com' (NameResolutionError): Connection timed out",
+            0.12,
+            prefix="077",
+            carrier_name="EgyptAir Cargo (MS)",
+        )
+        self.assertEqual(err_rec.status, "UNREACHABLE")
+        self.assertIn("timed out", err_rec.error_message.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

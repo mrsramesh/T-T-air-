@@ -184,8 +184,18 @@ class CarrierDataNormalizer:
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         orig = ov.origin_location or ov.origin_country or "---"
         dest = ov.destination_location or ov.destination_country or "---"
+        formatted_awb = getattr(ov, "formatted_tracking_number", getattr(res, "formatted_tracking_number", getattr(ov, "formatted_awb", raw_input)))
+        pcs_val = None
+        if ov.pieces:
+            digits_pcs = "".join(c for c in str(ov.pieces) if c.isdigit())
+            if digits_pcs:
+                pcs_val = int(digits_pcs)
+        elif ov.number_of_packages:
+            digits_pcs = "".join(c for c in str(ov.number_of_packages) if c.isdigit())
+            if digits_pcs:
+                pcs_val = int(digits_pcs)
         return UnifiedTrackingRecord(
-            awb=ov.formatted_awb,
+            awb=formatted_awb,
             raw_input=raw_input,
             carrier_prefix="125",
             carrier_name="British Airways Cargo (BA)",
@@ -195,7 +205,7 @@ class CarrierDataNormalizer:
             origin=orig,
             destination=dest,
             route=f"{orig} ➔ {dest}",
-            pieces=ov.pieces or ov.number_of_packages,
+            pieces=pcs_val,
             weight=ov.weight,
             flight_details=None,
             latest_activity=f"{ov.latest_status} ({ov.latest_date or ''})",
@@ -324,23 +334,43 @@ class CarrierDataNormalizer:
         )
 
     @classmethod
-    def create_error_record(cls, awb_input: str, error_message: str, elapsed_sec: float, prefix: str = "", carrier_name: str = "Unknown Carrier") -> UnifiedTrackingRecord:
+    def create_error_record(
+        cls,
+        awb_input: str,
+        error_message: str,
+        elapsed_sec: float,
+        prefix: str = "",
+        carrier_name: str = "Unknown Carrier",
+        carrier_code: str = "",
+        status_override: Optional[str] = None,
+    ) -> UnifiedTrackingRecord:
         clean_awb = re.sub(r"[^\d]", "", awb_input)
         formatted = f"{clean_awb[:3]}-{clean_awb[3:]}" if len(clean_awb) == 11 else awb_input
         err_lower = error_message.lower()
-        is_not_found = (
-            "not found" in err_lower
-            or "could not find" in err_lower
-            or "not available" in err_lower
-            or "no result" in err_lower
-            or "does not exist" in err_lower
-        )
-        status = "NOT_FOUND" if is_not_found else "ERROR"
+
+        if status_override:
+            status = status_override
+        elif any(phrase in err_lower for phrase in ("unsupported", "skip", "not in supported")):
+            status = "SKIPPED"
+        elif any(phrase in err_lower for phrase in (
+            "not found", "could not find", "not available", "no result", "does not exist", "no matching"
+        )):
+            status = "NOT_FOUND"
+        elif any(phrase in err_lower for phrase in (
+            "failed to resolve", "name resolution", "connection refused", "connection pool",
+            "timed out", "timeout", "unreachable", "max retries exceeded", "service unavailable",
+            "503", "502", "504", "portal unreachable", "network", "blocked"
+        )):
+            status = "UNREACHABLE"
+        else:
+            status = "ERROR"
+
         return UnifiedTrackingRecord(
             awb=formatted,
             raw_input=awb_input,
             carrier_prefix=prefix or (clean_awb[:3] if len(clean_awb) >= 3 else "---"),
             carrier_name=carrier_name,
+            carrier_code=carrier_code,
             status=status,
             status_detail=error_message,
             execution_time_sec=round(elapsed_sec, 3),

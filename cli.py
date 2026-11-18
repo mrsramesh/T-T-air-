@@ -1067,6 +1067,8 @@ def render_bulk_summary_table(summary: BulkTrackingSummary):
         "BOOKED": "[cyan]📋 BOOKED[/cyan]",
         "ACCEPTED": "[cyan]📦 ACCEPTED[/cyan]",
         "NOT_FOUND": "[bold red]✖ NOT FOUND[/bold red]",
+        "UNREACHABLE": "[bold red]🔌 UNREACHABLE[/bold red]",
+        "SKIPPED": "[dim white]⏭ SKIPPED[/dim white]",
         "ERROR": "[bold red]⚠ ERROR[/bold red]",
     }
 
@@ -1101,11 +1103,13 @@ def render_bulk_summary_table(summary: BulkTrackingSummary):
     kpi_grid.add_column(style="bold cyan")
 
     kpi_grid.add_row(
-        f"Total Shipments: [bold white]{summary.total_requested}[/]",
+        f"Total: [bold white]{summary.total_requested}[/]",
         f"Delivered: [bold green]{summary.total_delivered}[/]",
         f"In Transit: [bold yellow]{summary.total_in_transit}[/]",
-        f"Not Found/Errors: [bold red]{summary.total_not_found + summary.total_errors}[/]",
-        f"Total Elapsed Time: [bold cyan]{summary.total_time_sec}s[/]",
+        f"Not Found: [bold red]{summary.total_not_found}[/]",
+        f"Unreachable: [bold magenta]{getattr(summary, 'total_unreachable', 0)}[/]",
+        f"Skipped: [bold dim]{getattr(summary, 'total_skipped', 0)}[/]",
+        f"Elapsed: [bold cyan]{summary.total_time_sec}s[/]",
     )
 
     console.print(Panel(kpi_grid, title="[bold blue]📊 Batch Performance KPIs[/bold blue]", border_style="blue", box=box.ROUNDED))

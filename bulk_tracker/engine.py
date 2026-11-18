@@ -22,7 +22,7 @@ from parcels_tracker.client import ParcelsTrackerClient, ParcelsShipmentNotFound
 from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 
-from bulk_tracker.extractor import AWBExtractor, CARRIER_PREFIXES
+from bulk_tracker.extractor import AWBExtractor, CARRIER_PREFIXES, KNOWN_GLOBAL_IATA_PREFIXES
 from bulk_tracker.models import BulkTrackingSummary, UnifiedTrackingRecord
 from bulk_tracker.normalizer import CarrierDataNormalizer
 
@@ -61,23 +61,27 @@ class BulkCargoTracker:
         self._last_request_time: Dict[str, float] = {prefix: 0.0 for prefix in CARRIER_PREFIXES}
 
     @staticmethod
-    def identify_carrier(awb_input: str) -> Tuple[str, str]:
+    def identify_carrier(awb_input: str) -> Tuple[str, str, str, bool]:
         """
-        Identifies carrier prefix and name from an AWB string.
-        Returns (prefix, carrier_name).
+        Identifies carrier prefix, full name, 2-letter code, and active support status.
+        Returns (prefix, carrier_name, carrier_code, is_supported).
         """
         digits = "".join(c for c in str(awb_input) if c.isdigit())
-        if len(digits) >= 3 and digits[:3] in CARRIER_PREFIXES:
+        if len(digits) >= 3:
             prefix = digits[:3]
-            return prefix, CARRIER_PREFIXES[prefix][0]
+            if prefix in CARRIER_PREFIXES:
+                name, code = CARRIER_PREFIXES[prefix]
+                return prefix, name, code, True
+            if prefix in KNOWN_GLOBAL_IATA_PREFIXES:
+                name, code = KNOWN_GLOBAL_IATA_PREFIXES[prefix]
+                return prefix, name, code, False
+            return prefix, f"IATA Carrier ({prefix})", "XX", False
+
         if len(digits) == 8:
-            # 8 digits serial defaults to IndiGo or Kuwait depending on context
-            return "312", CARRIER_PREFIXES["312"][0]
-        # Fallback check
-        for p in CARRIER_PREFIXES:
-            if digits.startswith(p):
-                return p, CARRIER_PREFIXES[p][0]
-        return "098", CARRIER_PREFIXES["098"][0]
+            # 8 digits serial defaults to IndiGo (SmartKargo)
+            return "312", CARRIER_PREFIXES["312"][0], CARRIER_PREFIXES["312"][1], True
+
+        return "UNK", "Unknown Carrier", "XX", False
 
     def _polite_domain_delay(self, prefix: str):
         """
@@ -100,10 +104,26 @@ class BulkCargoTracker:
         """
         Tracks a single AWB safely with automatic retry on transient network errors.
         Guarantees a clean UnifiedTrackingRecord is always returned without raising.
+        Flags unsupported airline prefixes as SKIPPED.
+        Flags unreachable / timed out portals as UNREACHABLE.
         """
         t0 = time.time()
-        prefix, carrier_name = self.identify_carrier(raw_awb)
+        prefix, carrier_name, carrier_code, is_supported = self.identify_carrier(raw_awb)
 
+        # 1. Immediate Skip for Unsupported IATA Airline Prefixes
+        if not is_supported:
+            logger.info(f"Skipping AWB {raw_awb}: IATA prefix '{prefix}' ({carrier_name}) is unsupported.")
+            return CarrierDataNormalizer.create_error_record(
+                raw_awb,
+                f"IATA Prefix '{prefix}' ({carrier_name}) is not currently supported - Skipped",
+                time.time() - t0,
+                prefix=prefix,
+                carrier_name=carrier_name,
+                carrier_code=carrier_code,
+                status_override="SKIPPED",
+            )
+
+        # 2. Query Supported Carrier Portals
         for attempt in range(max_retries):
             try:
                 self._polite_domain_delay(prefix)
@@ -144,10 +164,14 @@ class BulkCargoTracker:
                     res = self.clients["020"].track(raw_awb)
                     return CarrierDataNormalizer.normalize_lufthansa(res, raw_awb, time.time() - t0)
 
-                else:
-                    # Default to Air India
+                elif prefix == "098":
                     res = self.clients["098"].track(raw_awb)
                     return CarrierDataNormalizer.normalize_airindia(res, raw_awb, time.time() - t0)
+
+                else:
+                    return CarrierDataNormalizer.create_error_record(
+                        raw_awb, f"Carrier prefix {prefix} not routed", time.time() - t0, prefix=prefix, carrier_name=carrier_name, carrier_code=carrier_code
+                    )
 
             except (
                 IndigoShipmentNotFoundError,
@@ -161,7 +185,7 @@ class BulkCargoTracker:
             ) as e:
                 # Do not retry definitive 404 Not Found responses
                 return CarrierDataNormalizer.create_error_record(
-                    raw_awb, str(e), time.time() - t0, prefix=prefix, carrier_name=carrier_name
+                    raw_awb, str(e), time.time() - t0, prefix=prefix, carrier_name=carrier_name, carrier_code=carrier_code
                 )
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} tracking {raw_awb} ({carrier_name}) error: {e}")
@@ -169,11 +193,11 @@ class BulkCargoTracker:
                     time.sleep(1.0 * (attempt + 1))
                 else:
                     return CarrierDataNormalizer.create_error_record(
-                        raw_awb, str(e), time.time() - t0, prefix=prefix, carrier_name=carrier_name
+                        raw_awb, str(e), time.time() - t0, prefix=prefix, carrier_name=carrier_name, carrier_code=carrier_code
                     )
 
         return CarrierDataNormalizer.create_error_record(
-            raw_awb, "Tracking timed out after multiple retries", time.time() - t0, prefix=prefix, carrier_name=carrier_name
+            raw_awb, "Tracking timed out after multiple retries", time.time() - t0, prefix=prefix, carrier_name=carrier_name, carrier_code=carrier_code
         )
 
     def track_batch(
@@ -226,8 +250,10 @@ class BulkCargoTracker:
         deliv = sum(1 for r in ordered_records if r.status == "DELIVERED")
         transit = sum(1 for r in ordered_records if r.status in ("IN_TRANSIT", "DEPARTED", "ARRIVED", "BOOKED", "ACCEPTED"))
         not_found = sum(1 for r in ordered_records if r.status == "NOT_FOUND")
+        unreachable = sum(1 for r in ordered_records if r.status == "UNREACHABLE")
+        skipped = sum(1 for r in ordered_records if r.status == "SKIPPED")
         errors = sum(1 for r in ordered_records if r.status == "ERROR")
-        success = total_count - not_found - errors
+        success = sum(1 for r in ordered_records if r.status in ("DELIVERED", "IN_TRANSIT", "DEPARTED", "ARRIVED", "BOOKED", "ACCEPTED"))
 
         return BulkTrackingSummary(
             total_requested=total_count,
@@ -235,6 +261,8 @@ class BulkCargoTracker:
             total_delivered=deliv,
             total_in_transit=transit,
             total_not_found=not_found,
+            total_unreachable=unreachable,
+            total_skipped=skipped,
             total_errors=errors,
             total_time_sec=total_time,
             records=ordered_records,
