@@ -316,13 +316,73 @@ python3 server.py
 ```
 
 - **Interactive Web Dashboard**: Open `http://localhost:8000/` in your browser.
-  - Quick-sample buttons for IndiGo CarGo (`312-9298-9396`), Neos Air Cargo (`703-13715800`, `703-13715332`), EgyptAir Cargo (`077-59060002`, `077-59060945`), Qatar Airways (`157-5366-1580`), Virgin Atlantic (`932-78989514`), British Airways (`125-24128344`), Kuwait Airways (`229-18148900`, `229-17349566`), Emirates (`176-63116340`), Lufthansa (`020-04585280`), and Air India (`098-30244056`).
-  - Real-time status pills, route map overview, package weights, flight legs, and timeline milestone events.
+  - **Mode Toggle**: Switch seamlessly between **`🔍 Single AWB Tracker`** and **`⚡ Bulk & Multi-AWB Engine`**.
+  - **Bulk Input Methods**:
+    - **Paste AWBs**: Multi-line, comma, semicolon, space, tab, or pipe separated text area.
+    - **Upload Spreadsheet**: Drag & drop or browse `.xlsx` (all sheets auto-scanned), `.csv`, or `.txt` files.
+    - **Quick Prefill**: `⚡ Fill 8-Airline Sample Batch` button for instant one-click demonstration.
+  - **Live Progress & Executive KPI Dashboard**:
+    - Real-time animated progress bar with domain rate-limiting.
+    - KPI cards: Total Shipments, Succeeded, Failed/Not Found, Delivered, In-Transit, Arrived, Booked/Accepted, Elapsed Time.
+  - **Interactive Master Table**:
+    - Live search filter by AWB, Airline, Station (BOM, BKK, KWI, CAI, LHR, ORD), or Flight.
+    - Status filter dropdown (`DELIVERED`, `IN_TRANSIT`, `ARRIVED`, `BOOKED`, `ACCEPTED`, `NOT_FOUND`, `ERROR`).
+    - One-click **`📊 Export Excel (.xlsx)`** and **`📄 Export CSV`** downloads.
+    - **`👁 Inspect` Shipment Modal**: Opens comprehensive details, milestone timelines, routing, and raw JSON payload.
+  - **Single Tracker Mode**:
+    - Quick-sample buttons for all 10 airlines (IndiGo, Neos, EgyptAir, Qatar, Virgin, British Airways, Kuwait, Emirates, Lufthansa, Air India).
+    - Real-time status pills, route map overview, package weights, flight legs, and timeline milestone events.
 - **REST API Endpoints**:
+  - `POST /api/v1/track/bulk` (Accepts JSON `{ "text": "...", "awbs": [...], "workers": 5 }` and returns unified batch results)
+  - `POST /api/v1/track/upload` (Multipart file upload for `.xlsx`, `.csv`, `.txt` spreadsheets)
+  - `POST /api/v1/export/excel` (Streams executive-grade formatted `.xlsx` workbook)
+  - `POST /api/v1/export/csv` (Streams standard UTF-8 `.csv` file)
   - `GET /api/v1/track/{awb}` (Auto-detects carrier from prefix `312`, `703`, `077`, `157`, `932`, `125`, `229`, `176`, `020`, or `098`)
-  - `POST /api/v1/track/batch` (Batch track multiple AWBs across carriers)
+  - `POST /api/v1/track/batch` (Legacy single-carrier batch track)
   - `GET /health` (System health and carrier coverage for all 10 airlines)
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
+
+---
+
+## ⚡ Bulk / Multi-AWB Tracking Engine
+
+The system includes a high-throughput, anti-bot protected **Bulk Tracking Engine** (`bulk_tracker/`):
+
+### 1. Multi-Format AWB Extraction (`AWBExtractor`)
+- Automatically parses and extracts standard 11-digit (`PPP-SSSSSSSS`, `PPP SSSSSSSS`, `PPP-SSSS-SSSS`) and 8-digit air waybill numbers.
+- Ingests raw copy-pasted text, comma/tab/space/newline separated lists, CSV files, and multi-sheet Excel workbooks (`.xlsx`).
+- Deduplicates entries while preserving original order.
+
+### 2. Anti-Bot Protection & Domain Rate Limiting (`BulkCargoTracker`)
+- **Domain Locks**: Concurrency to any individual airline portal is politely throttled (default max 2 concurrent requests per airline domain) with random jitter delay (150ms - 350ms) to prevent triggering Cloudflare, Akamai, or AWS WAF rate-limiting.
+- **Cross-Carrier Parallelism**: Shipments across different airlines run fully in parallel across a configurable thread pool (default 5 workers, up to 10).
+- **Fault Isolation**: An invalid or non-existent AWB never breaks the batch; failures are cleanly categorized as `NOT_FOUND` or `ERROR` while other shipments complete normally.
+- **Exponential Backoff**: Recovers gracefully from transient network drops.
+
+### 3. Executive-Grade Excel & CSV Exports
+- **Excel Report (`.xlsx`)**:
+  - Sheet 1: `Shipments Tracking` with corporate styling, frozen top header, auto-fit column widths, zebra rows, and color-coded status badges.
+  - Sheet 2: `Summary & KPIs` containing executive delivery metrics, carrier breakdowns, success rates, and elapsed batch runtimes.
+- **CSV Report (`.csv`)**: Standardized tabular format ready for import into ERPs, TMS (Transportation Management Systems), or data pipelines.
+
+### 4. CLI Multi-AWB & Bulk Usage
+
+```bash
+# Track multiple AWBs across different carriers simultaneously
+python3 cli.py 312-9298-9396 703-13715800 077-59060002 157-5366-1580 125-24128344
+
+# Bulk track from a comma, newline, or space-separated string
+python3 cli.py --bulk "312-9298-9396, 703-13715800; 077-59060002 125-24128344"
+
+# Ingest and track an entire Excel spreadsheet or CSV file
+python3 cli.py --file shipments.xlsx
+
+# Export results directly to Excel (.xlsx) and CSV
+python3 cli.py 312-9298-9396 703-13715800 077-59060002 --export-excel tracked_shipments.xlsx --export-csv tracked_shipments.csv
+
+# Customize parallel worker concurrency
+python3 cli.py --bulk "..." --workers 8
+```
 
 ---
 

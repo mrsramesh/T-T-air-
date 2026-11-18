@@ -18,6 +18,7 @@ import re
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn, TimeElapsedColumn
 from rich import box
 
 from airindia_tracker.client import AirIndiaCargoClient
@@ -34,6 +35,14 @@ from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
 from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError
+from bulk_tracker import (
+    BulkCargoTracker,
+    AWBExtractor,
+    ExcelReportExporter,
+    CSVReportExporter,
+    BulkTrackingSummary,
+    UnifiedTrackingRecord,
+)
 
 console = Console()
 
@@ -1030,14 +1039,109 @@ def render_indigo_delivery_orders(delivery_orders):
     console.print(table)
 
 
+# ==================== BULK SUMMARY TABLE RENDERING ====================
+
+def render_bulk_summary_table(summary: BulkTrackingSummary):
+    """Render executive multi-carrier summary table and KPIs."""
+    table = Table(
+        title="[bold blue]✈ Global Multi-Carrier Air Cargo Batch Tracking Results[/bold blue]",
+        box=box.ROUNDED,
+        header_style="bold white",
+    )
+    table.add_column("#", justify="center", style="dim", width=4)
+    table.add_column("AWB Number", style="bold white", justify="center")
+    table.add_column("Carrier", style="bold cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Route", justify="center", style="bold magenta")
+    table.add_column("Pieces", justify="right", style="green")
+    table.add_column("Weight", justify="right", style="bold green")
+    table.add_column("Flight Details", style="bold yellow")
+    table.add_column("Latest Activity", style="white")
+    table.add_column("Time", justify="right", style="dim")
+
+    STATUS_STYLES = {
+        "DELIVERED": "[bold green]✔ DELIVERED[/bold green]",
+        "ARRIVED": "[bold blue]✈ ARRIVED[/bold blue]",
+        "DEPARTED": "[bold yellow]🛫 DEPARTED[/bold yellow]",
+        "IN_TRANSIT": "[bold yellow]⏳ IN TRANSIT[/bold yellow]",
+        "BOOKED": "[cyan]📋 BOOKED[/cyan]",
+        "ACCEPTED": "[cyan]📦 ACCEPTED[/cyan]",
+        "NOT_FOUND": "[bold red]✖ NOT FOUND[/bold red]",
+        "ERROR": "[bold red]⚠ ERROR[/bold red]",
+    }
+
+    for idx, r in enumerate(summary.records, start=1):
+        status_disp = STATUS_STYLES.get(r.status, f"[dim]{r.status}[/dim]")
+        pcs_txt = f"{r.pieces} pcs" if r.pieces is not None else "---"
+        lat_act = r.latest_activity or (r.error_message or "---")
+        if len(lat_act) > 42:
+            lat_act = lat_act[:39] + "..."
+
+        table.add_row(
+            str(idx),
+            r.awb,
+            r.carrier_name,
+            status_disp,
+            r.route,
+            pcs_txt,
+            r.weight or "---",
+            r.flight_details or "---",
+            lat_act,
+            f"{r.execution_time_sec}s",
+        )
+
+    console.print(table)
+
+    # KPI summary metrics panel
+    kpi_grid = Table.grid(padding=(0, 3))
+    kpi_grid.add_column(style="bold white")
+    kpi_grid.add_column(style="bold green")
+    kpi_grid.add_column(style="bold yellow")
+    kpi_grid.add_column(style="bold red")
+    kpi_grid.add_column(style="bold cyan")
+
+    kpi_grid.add_row(
+        f"Total Shipments: [bold white]{summary.total_requested}[/]",
+        f"Delivered: [bold green]{summary.total_delivered}[/]",
+        f"In Transit: [bold yellow]{summary.total_in_transit}[/]",
+        f"Not Found/Errors: [bold red]{summary.total_not_found + summary.total_errors}[/]",
+        f"Total Elapsed Time: [bold cyan]{summary.total_time_sec}s[/]",
+    )
+
+    console.print(Panel(kpi_grid, title="[bold blue]📊 Batch Performance KPIs[/bold blue]", border_style="blue", box=box.ROUNDED))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Production Multi-Carrier Air Cargo Tracker (Air India, Lufthansa Cargo, Emirates SkyCargo, Kuwait Airways, British Airways, Virgin Atlantic, Qatar Airways Cargo, EgyptAir Cargo, Neos Air Cargo, IndiGo CarGo)"
     )
     parser.add_argument(
         "awb",
-        nargs="+",
-        help="One or more AWB numbers (e.g. '312-9298-9396' IndiGo, '703-13715800' Neos Air Cargo, '077-59060002' EgyptAir, '157-5366-1580' Qatar Airways, '932-78989514' Virgin Atlantic, '125-24128344' British Airways, '229-18148900' Kuwait Airways, '176-63116340' Emirates, '020-04585280' Lufthansa, '098-30244056' Air India)",
+        nargs="*",
+        default=[],
+        help="One or more AWB numbers (e.g. '312-9298-9396' IndiGo, '703-13715800' Neos, '077-59060002' EgyptAir, '157-5366-1580' Qatar, etc.)",
+    )
+    parser.add_argument(
+        "--file", "-f",
+        help="Path to an Excel (.xlsx), CSV (.csv), or Text (.txt) file containing multiple AWBs",
+    )
+    parser.add_argument(
+        "--bulk", "-b",
+        help="Paste a raw text block of multiple AWBs separated by commas, spaces, or newlines",
+    )
+    parser.add_argument(
+        "--export-excel",
+        help="File path to save tracking results as an executive Excel spreadsheet (.xlsx)",
+    )
+    parser.add_argument(
+        "--export-csv",
+        help="File path to save tracking results as a CSV file (.csv)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=5,
+        help="Number of concurrent workers for batch tracking (default: 5)",
     )
     parser.add_argument(
         "--carrier",
@@ -1064,6 +1168,73 @@ def main():
 
     args = parser.parse_args()
 
+    # Collect and extract all target AWBs from arguments, file, or bulk text
+    target_awbs = []
+    if args.awb:
+        for a in args.awb:
+            target_awbs.extend(AWBExtractor.extract_from_text(a))
+    if args.file:
+        file_extracted = AWBExtractor.extract_from_any(args.file)
+        console.print(f"[bold cyan]📁 Extracted {len(file_extracted)} AWBs from file:[/bold cyan] {args.file}")
+        target_awbs.extend(file_extracted)
+    if args.bulk:
+        bulk_extracted = AWBExtractor.extract_from_text(args.bulk)
+        console.print(f"[bold cyan]📋 Extracted {len(bulk_extracted)} AWBs from bulk input text[/bold cyan]")
+        target_awbs.extend(bulk_extracted)
+
+    # Deduplicate while preserving order
+    seen_awbs = set()
+    unique_awbs = []
+    for a in target_awbs:
+        if a not in seen_awbs:
+            seen_awbs.add(a)
+            unique_awbs.append(a)
+
+    if not unique_awbs:
+        parser.print_help()
+        console.print("\n[bold red]❌ Error:[/bold red] No valid AWB numbers provided. Supply AWB arguments, --file, or --bulk.")
+        sys.exit(1)
+
+    # If multiple AWBs or explicit export flags requested, run Bulk Engine
+    is_bulk = len(unique_awbs) > 1 or bool(args.export_excel or args.export_csv or args.file or args.bulk)
+
+    if is_bulk and not args.browser:
+        console.print(f"[bold blue]⚡ Initiating concurrent tracking for {len(unique_awbs)} shipments...[/bold blue]\n")
+        tracker = BulkCargoTracker(max_global_workers=args.workers)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+            BarColumn(complete_style="green", finished_style="bold green"),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"Tracking {len(unique_awbs)} shipments across 10 airlines...", total=len(unique_awbs))
+
+            def on_progress(done, total, rec):
+                color = "green" if rec.status == "DELIVERED" else ("yellow" if rec.status in ("IN_TRANSIT", "DEPARTED", "ARRIVED") else "red")
+                progress.update(task, completed=done, description=f"Tracked [bold white]{rec.awb}[/] ({rec.carrier_name}) ➔ [bold {color}]{rec.status}[/]")
+
+            summary = tracker.track_batch(unique_awbs, progress_callback=on_progress)
+
+        console.print()
+        if args.json:
+            print(json.dumps([r.model_dump() for r in summary.records], indent=2))
+        else:
+            render_bulk_summary_table(summary)
+
+        if args.export_excel:
+            ExcelReportExporter.save_to_file(summary.records, args.export_excel, summary)
+            console.print(f"[bold green]✔ Excel report exported successfully to:[/bold green] {args.export_excel}")
+
+        if args.export_csv:
+            CSVReportExporter.save_to_file(summary.records, args.export_csv)
+            console.print(f"[bold green]✔ CSV report exported successfully to:[/bold green] {args.export_csv}")
+
+        return
+
+    # Single AWB detailed inspection mode
     lh_client = LufthansaCargoClient()
     ai_client = AirIndiaCargoClient()
     ek_client = EmiratesTrackerClient()
@@ -1081,7 +1252,7 @@ def main():
 
     results = []
 
-    for raw_awb in args.awb:
+    for raw_awb in unique_awbs:
         carrier = args.carrier
         if carrier == "auto":
             carrier = detect_carrier(raw_awb)

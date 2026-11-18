@@ -22,6 +22,17 @@ from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
 from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError
+import io
+import openpyxl
+from bulk_tracker import (
+    AWBExtractor,
+    CarrierDataNormalizer,
+    ExcelReportExporter,
+    CSVReportExporter,
+    BulkCargoTracker,
+    UnifiedTrackingRecord,
+    BulkTrackingSummary,
+)
 
 
 class TestCargoTrackers(unittest.TestCase):
@@ -362,6 +373,176 @@ class TestCargoTrackers(unittest.TestCase):
         with self.assertRaises(IndigoShipmentNotFoundError) as ctx:
             self.indigo_client.track("312-99999999")
         self.assertIn("Could not find shipment for AWB 312-99999999", str(ctx.exception))
+
+    def test_awb_extractor_various_formats(self):
+        text = """
+        Tracking List:
+        312-9298-9396, 703 13715800; 07759060002
+        157-5366-1580 | 125-24128344
+        229-18148900
+        Random string 12345
+        312-92989396 (duplicate of first)
+        """
+        extracted = AWBExtractor.extract_from_text(text)
+        self.assertIn("312-92989396", extracted)
+        self.assertIn("703-13715800", extracted)
+        self.assertIn("077-59060002", extracted)
+        self.assertIn("157-53661580", extracted)
+        self.assertIn("125-24128344", extracted)
+        self.assertIn("229-18148900", extracted)
+        # Check deduplication
+        awb_keys = [a.replace("-", "").replace(" ", "") for a in extracted]
+        self.assertEqual(len(awb_keys), len(set(awb_keys)))
+
+    def test_awb_extractor_from_excel(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shipments"
+        ws.append(["AWB Header", "Notes"])
+        ws.append(["312-9298-9396", "IndiGo"])
+        ws.append(["703-13715800", "Neos Air"])
+        
+        ws2 = wb.create_sheet(title="More")
+        ws2.append(["ID", "077-59060002"])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        extracted = AWBExtractor.extract_from_excel(buf)
+        self.assertIn("312-92989396", extracted)
+        self.assertIn("703-13715800", extracted)
+        self.assertIn("077-59060002", extracted)
+
+    def test_excel_and_csv_report_generation(self):
+        record1 = UnifiedTrackingRecord(
+            awb="312-92989396",
+            raw_input="312-9298-9396",
+            carrier_prefix="312",
+            carrier_name="IndiGo CarGo (6E)",
+            carrier_code="6E",
+            status="DELIVERED",
+            status_detail="Delivered at BKK",
+            origin="BOM",
+            destination="BKK",
+            route="BOM ➔ BKK",
+            pieces=62,
+            weight="898.00 Kgs",
+            flight_details="6E1087 / 08/11/2026",
+            latest_activity="Delivered at BKK",
+            latest_location="BKK",
+            execution_time_sec=0.45,
+        )
+        record2 = UnifiedTrackingRecord(
+            awb="703-99999999",
+            raw_input="703-9999-9999",
+            carrier_prefix="703",
+            carrier_name="Neos Air Cargo (NO)",
+            carrier_code="NO",
+            status="NOT_FOUND",
+            status_detail="Shipment not found",
+            error_message="Shipment not found in system",
+            execution_time_sec=0.32,
+        )
+
+        records = [record1, record2]
+        
+        # Test Excel Export
+        excel_bytes = ExcelReportExporter.export_to_bytes(records)
+        self.assertGreater(len(excel_bytes), 1000)
+        
+        # Verify Excel can be re-opened and has 2 sheets
+        wb = openpyxl.load_workbook(io.BytesIO(excel_bytes))
+        self.assertIn("Shipments Tracking", wb.sheetnames)
+        self.assertIn("Summary & KPIs", wb.sheetnames)
+
+        # Test CSV Export
+        csv_bytes = CSVReportExporter.export_to_bytes(records)
+        csv_str = csv_bytes.decode("utf-8")
+        self.assertIn("312-92989396", csv_str)
+        self.assertIn("DELIVERED", csv_str)
+        self.assertIn("703-99999999", csv_str)
+        self.assertIn("NOT_FOUND", csv_str)
+
+    def test_bulk_cargo_tracker_batch_run(self):
+        from unittest.mock import MagicMock
+        from indigo_tracker.models import IndigoTrackingResult, IndigoOverview
+
+        tracker = BulkCargoTracker(max_global_workers=2)
+        
+        # Mock successful tracking for first AWB and not found for second
+        mock_overview = IndigoOverview(
+            awb_number="31292989396",
+            formatted_awb="312-92989396",
+            origin="BOM",
+            destination="BKK",
+            gross_weight="898.00 Kgs",
+            pieces=62,
+            current_status="Delivered at BKK",
+            latest_activity="Delivered at BKK",
+            issued_to="ESSILOR MANUFACTURING THAILAND",
+            flight_no="6E1087",
+        )
+        mock_resp = IndigoTrackingResult(
+            awb="31292989396",
+            awb_prefix="312",
+            awb_serial="92989396",
+            formatted_awb="312-92989396",
+            overview=mock_overview,
+            booking_info=[],
+            status_history=[],
+            delivery_orders=[],
+        )
+
+        def mock_track(awb):
+            if "9298" in str(awb):
+                return mock_resp
+            raise IndigoShipmentNotFoundError(f"Could not find shipment for AWB {awb}")
+
+        tracker.clients["312"].track = MagicMock(side_effect=mock_track)
+
+        summary = tracker.track_batch(["312-9298-9396", "312-99999999"])
+        self.assertEqual(summary.total_requested, 2)
+        self.assertEqual(summary.total_successful, 1)
+        self.assertEqual(summary.total_not_found, 1)
+        self.assertEqual(summary.total_delivered, 1)
+
+    def test_fastapi_bulk_and_export_endpoints(self):
+        from fastapi.testclient import TestClient
+        import server
+
+        client = TestClient(server.app)
+
+        payload = {
+            "records": [
+                {
+                    "awb": "312-92989396",
+                    "raw_input": "312-9298-9396",
+                    "carrier_prefix": "312",
+                    "carrier_name": "IndiGo CarGo (6E)",
+                    "carrier_code": "6E",
+                    "status": "DELIVERED",
+                    "status_detail": "Delivered at BKK",
+                    "origin": "BOM",
+                    "destination": "BKK",
+                    "route": "BOM ➔ BKK",
+                    "pieces": 62,
+                    "weight": "898.00 Kgs",
+                    "execution_time_sec": 0.45,
+                }
+            ]
+        }
+        res_excel = client.post("/api/v1/export/excel", json=payload)
+        self.assertEqual(res_excel.status_code, 200)
+        self.assertGreater(len(res_excel.content), 1000)
+
+        res_csv = client.post("/api/v1/export/csv", json=payload)
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertIn("312-92989396", res_csv.text)
+
+        res_health = client.get("/health")
+        self.assertEqual(res_health.status_code, 200)
+        self.assertEqual(len(res_health.json()["carriers"]), 10)
 
 
 if __name__ == "__main__":
