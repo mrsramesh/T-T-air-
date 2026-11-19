@@ -23,7 +23,7 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: var(--bg); color: var(--text-main); padding: 1.5rem 1rem; }
-        .container { max-width: 1180px; margin: 0 auto; }
+        .container { max-width: 1440px; margin: 0 auto; width: 96%; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; }
         .logo-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .badge-6e { background: #002d62; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #1e40af; }
@@ -129,62 +129,135 @@
         .log-error { color: #f87171; }
         .log-skipped { color: #94a3b8; }
 
-        /* KPI Cards */
-        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
-        .kpi-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .kpi-card .m-val { font-size: 1.45rem; font-weight: 800; color: #0f172a; }
-        .kpi-card .m-lbl { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.3px; }
-        .kpi-card.kpi-success .m-val { color: #16a34a; }
-        .kpi-card.kpi-failed .m-val { color: #dc2626; }
-        .kpi-card.kpi-transit .m-val { color: #2563eb; }
-        .kpi-card.kpi-unreachable .m-val { color: #b91c1c; }
-        .kpi-card.kpi-skipped .m-val { color: #64748b; }
+        /* Enterprise KPI Cards */
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+        .kpi-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); position: relative; overflow: hidden; transition: all 0.15s ease; }
+        .kpi-card:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06); }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #cbd5e1; }
+        .kpi-card.kpi-total::before { background: #2563eb; }
+        .kpi-card.kpi-success::before { background: #10b981; }
+        .kpi-card.kpi-transit::before { background: #3b82f6; }
+        .kpi-card.kpi-arrived::before { background: #8b5cf6; }
+        .kpi-card.kpi-failed::before { background: #f43f5e; }
+        .kpi-card.kpi-unreachable::before { background: #f59e0b; }
+        .kpi-card.kpi-skipped::before { background: #64748b; }
+        .kpi-card.kpi-duration::before { background: #06b6d4; }
+        .kpi-card .m-val { font-size: 1.5rem; font-weight: 800; color: #0f172a; font-family: 'JetBrains Mono', monospace; }
+        .kpi-card .m-lbl { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.4px; }
+        .kpi-card.kpi-success .m-val { color: #047857; }
+        .kpi-card.kpi-failed .m-val { color: #e11d48; }
+        .kpi-card.kpi-transit .m-val { color: #1d4ed8; }
+        .kpi-card.kpi-unreachable .m-val { color: #b45309; }
+        .kpi-card.kpi-skipped .m-val { color: #475569; }
 
-        /* Bulk Table Card */
-        .bulk-results-card { background: white; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; margin-bottom: 2rem; }
-        .bulk-toolbar { padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .filter-group { display: flex; gap: 10px; align-items: center; flex: 1; min-width: 280px; }
-        .filter-input { flex: 1; padding: 0.6rem 0.85rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.88rem; outline: none; }
-        .filter-input:focus { border-color: #2563eb; }
-        .filter-select { padding: 0.6rem 0.85rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.88rem; background: white; outline: none; }
+        /* Premium Bulk Results Card */
+        .bulk-results-card { background: white; border-radius: 14px; border: 1px solid var(--border); box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04); overflow: hidden; display: none; margin-bottom: 2.5rem; }
+        .bulk-toolbar { padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .filter-group { display: flex; gap: 10px; align-items: center; flex: 1; min-width: 320px; }
+        .search-input-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+        .search-icon { position: absolute; left: 12px; font-size: 0.9rem; color: #94a3b8; pointer-events: none; }
+        .filter-input { width: 100%; padding: 0.65rem 2.2rem 0.65rem 2.4rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.88rem; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
+        .filter-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .btn-clear-search { position: absolute; right: 10px; background: none; border: none; font-size: 1.1rem; color: #94a3b8; cursor: pointer; padding: 2px 6px; }
+        .btn-clear-search:hover { color: #0f172a; }
+        .bulk-toolbar-right { display: flex; align-items: center; gap: 12px; }
+        .match-count-badge { font-size: 0.82rem; font-weight: 600; color: #64748b; background: #f1f5f9; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); white-space: nowrap; }
         .export-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-export-excel { background: #16a34a; color: white; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.2s; }
-        .btn-export-excel:hover { opacity: 0.9; }
-        .btn-export-csv { background: #0284c7; color: white; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.2s; }
-        .btn-export-csv:hover { opacity: 0.9; }
-        .btn-inspect { background: #f1f5f9; border: 1px solid var(--border); color: #1e293b; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-        .btn-inspect:hover { background: #e2e8f0; color: #0f172a; }
+        .btn-export-excel { background: #059669; color: white; border: none; padding: 0.65rem 1.15rem; border-radius: 7px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(5,150,105,0.2); }
+        .btn-export-excel:hover { background: #047857; box-shadow: 0 2px 4px rgba(4,120,87,0.3); }
+        .btn-export-csv { background: #0284c7; color: white; border: none; padding: 0.65rem 1.15rem; border-radius: 7px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(2,132,199,0.2); }
+        .btn-export-csv:hover { background: #0369a1; box-shadow: 0 2px 4px rgba(3,105,161,0.3); }
 
-        /* Status Pills */
-        .status-badge { display: inline-block; padding: 3px 9px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
-        .st-DELIVERED { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-        .st-IN_TRANSIT, .st-DEPARTED { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
-        .st-ARRIVED { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-        .st-BOOKED, .st-ACCEPTED { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
-        .st-NOT_FOUND { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-        .st-UNREACHABLE { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
-        .st-SKIPPED { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-        .st-ERROR { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        /* Quick Status Filter Pills */
+        .quick-status-pills { display: flex; gap: 8px; padding: 0.75rem 1.25rem; background: #ffffff; border-bottom: 1px solid var(--border); overflow-x: auto; align-items: center; }
+        .pill-filter { border: 1px solid var(--border); background: #f8fafc; color: #475569; padding: 5px 13px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; outline: none; }
+        .pill-filter:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+        .pill-filter.active { background: #0f172a; color: #ffffff; border-color: #0f172a; box-shadow: 0 2px 4px rgba(15,23,42,0.2); }
+        .pill-filter .cnt { background: rgba(0,0,0,0.08); padding: 1px 6px; border-radius: 9999px; font-size: 0.73rem; font-weight: 700; }
+        .pill-filter.active .cnt { background: rgba(255,255,255,0.25); color: #ffffff; }
 
-        /* Airline Pills */
-        .carrier-tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; font-family: monospace; white-space: nowrap; }
-        .ct-indigo { background: #eff6ff; color: #002d62; border: 1px solid #bfdbfe; }
-        .ct-neos { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-        .ct-cargoflash { background: #eff6ff; color: #002d62; border: 1px solid #bfdbfe; }
-        .ct-qatar { background: #fdf2f8; color: #5c0632; border: 1px solid #fbcfe8; }
-        .ct-virgin { background: #fef2f2; color: #e10a0a; border: 1px solid #fecaca; }
-        .ct-britishairways { background: #eff6ff; color: #00205b; border: 1px solid #bfdbfe; }
-        .ct-kuwait { background: #f0f9ff; color: #0f3d6e; border: 1px solid #bae6fd; }
-        .ct-emirates { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-        .ct-lufthansa { background: #eff6ff; color: #05164d; border: 1px solid #bfdbfe; }
-        .ct-airindia { background: #fef2f2; color: #d71921; border: 1px solid #fecaca; }
-        .ct-other { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        /* Modern Table & Cell Layouts */
+        .bulk-table-wrap { overflow-x: auto; max-height: 780px; position: relative; }
+        .bulk-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 0.88rem; }
+        .bulk-table thead th { position: sticky; top: 0; background: #f8fafc; color: #475569; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.85rem 1rem; border-bottom: 2px solid var(--border); z-index: 10; white-space: nowrap; }
+        .bulk-table tbody tr { transition: background-color 0.15s ease; border-bottom: 1px solid #f1f5f9; }
+        .bulk-table tbody tr:hover { background-color: #f8fafc; }
+        .bulk-table tbody td { padding: 0.85rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #1e293b; }
+
+        /* AWB Column */
+        .cell-awb-wrap { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+        .awb-code { font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace; font-weight: 700; font-size: 0.94rem; color: #0f172a; letter-spacing: 0.2px; }
+        .btn-copy-mini { background: #f1f5f9; border: 1px solid var(--border); color: #64748b; border-radius: 4px; padding: 2px 5px; cursor: pointer; font-size: 0.72rem; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-copy-mini:hover { background: #e2e8f0; color: #0f172a; border-color: #cbd5e1; }
+
+        /* Airline Chip */
+        .carrier-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+        .carrier-chip .prefix-chip { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 0.72rem; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.06); }
+        .ct-indigo { background: #e0e7ff; color: #1e1b4b; border-color: #c7d2fe; }
+        .ct-neos { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+        .ct-cargoflash { background: #eff6ff; color: #1e3a8a; border-color: #bfdbfe; }
+        .ct-qatar { background: #fdf2f8; color: #701a75; border-color: #fbcfe8; }
+        .ct-virgin { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .ct-britishairways { background: #eef2ff; color: #1e1b4b; border-color: #c7d2fe; }
+        .ct-kuwait { background: #f0f9ff; color: #0c4a6e; border-color: #bae6fd; }
+        .ct-emirates { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .ct-lufthansa { background: #eff6ff; color: #05164d; border-color: #bfdbfe; }
+        .ct-airindia { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .ct-other { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
+
+        /* Status Badge */
+        .badge-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 9999px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+        .badge-status .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .bs-delivered { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .bs-delivered .status-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .bs-transit { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .bs-transit .status-dot { background: #3b82f6; }
+        .bs-departed { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+        .bs-departed .status-dot { background: #0ea5e9; }
+        .bs-arrived { background: #fdf4ff; color: #7e22ce; border: 1px solid #f5d0fe; }
+        .bs-arrived .status-dot { background: #a855f7; }
+        .bs-booked { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+        .bs-booked .status-dot { background: #8b5cf6; }
+        .bs-notfound { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+        .bs-notfound .status-dot { background: #f43f5e; }
+        .bs-skipped { background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; }
+        .bs-skipped .status-dot { background: #94a3b8; }
+        .bs-unreachable { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+        .bs-unreachable .status-dot { background: #f59e0b; }
+        .bs-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .bs-error .status-dot { background: #ef4444; }
+
+        /* Route Chips */
+        .route-pill-box { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+        .apt-code { font-weight: 800; font-size: 0.82rem; color: #0f172a; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; }
+        .route-arrow { color: #64748b; font-size: 0.8rem; }
+
+        /* Pieces & Weight Pill */
+        .pw-pill-box { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 0.8rem; }
+        .pw-badge { background: #f1f5f9; color: #334155; padding: 3px 7px; border-radius: 5px; border: 1px solid var(--border); font-weight: 600; }
+        .pw-badge strong { color: #0f172a; font-weight: 800; }
+
+        /* Flight Chips */
+        .flight-chips-wrap { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; max-width: 170px; }
+        .fl-chip { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+        .fl-chip-more { background: #f1f5f9; color: #475569; border-color: #cbd5e1; cursor: help; }
+
+        /* Message & Event */
+        .msg-cell { max-width: 290px; font-size: 0.82rem; line-height: 1.45; }
+        .msg-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; color: #334155; }
+        .note-skipped { display: inline-block; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-bottom: 2px; }
+        .note-notfound { display: inline-block; background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-bottom: 2px; }
+        .note-unreachable { display: inline-block; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-bottom: 2px; }
+
+        /* Inspect Button */
+        .btn-inspect-premium { background: #ffffff; border: 1.5px solid #cbd5e1; color: #1e293b; padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.04); white-space: nowrap; }
+        .btn-inspect-premium:hover { background: #2563eb; color: #ffffff; border-color: #2563eb; box-shadow: 0 2px 4px rgba(37,99,235,0.25); }
 
         /* Modal Dialog */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; backdrop-filter: blur(2px); }
-        .modal-wrap { background: white; border-radius: 12px; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); border: 1px solid var(--border); }
+        .modal-wrap { background: white; border-radius: 14px; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); border: 1px solid var(--border); }
         .modal-head { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-        .modal-head h3 { font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+        .modal-head h3 { font-size: 1.25rem; font-weight: 700; color: #0f172a; font-family: 'JetBrains Mono', monospace; }
         .modal-close-btn { background: none; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b; padding: 4px 8px; border-radius: 4px; }
         .modal-close-btn:hover { color: #0f172a; background: #e2e8f0; }
         .modal-body { padding: 1.5rem 1.75rem; }
@@ -415,7 +488,7 @@
 
             <!-- Bulk KPI Metrics Row -->
             <div class="kpi-row" id="bulkKpiRow" style="display: none;">
-                <div class="kpi-card">
+                <div class="kpi-card kpi-total">
                     <div class="m-lbl">Total Shipments</div>
                     <div class="m-val" id="kpiTotal">0</div>
                 </div>
@@ -427,8 +500,8 @@
                     <div class="m-lbl">In-Transit / Dep</div>
                     <div class="m-val" id="kpiTransit">0</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="m-lbl">Arrived</div>
+                <div class="kpi-card kpi-arrived">
+                    <div class="m-lbl">Arrived at Dest</div>
                     <div class="m-val" id="kpiArrived">0</div>
                 </div>
                 <div class="kpi-card kpi-failed">
@@ -436,14 +509,14 @@
                     <div class="m-val" id="kpiFailed">0</div>
                 </div>
                 <div class="kpi-card kpi-unreachable">
-                    <div class="m-lbl">🔌 Unreachable</div>
+                    <div class="m-lbl">Unreachable</div>
                     <div class="m-val" id="kpiUnreachable">0</div>
                 </div>
                 <div class="kpi-card kpi-skipped">
-                    <div class="m-lbl">⏭ Skipped (Prefix)</div>
+                    <div class="m-lbl">Skipped (Prefix)</div>
                     <div class="m-val" id="kpiSkipped">0</div>
                 </div>
-                <div class="kpi-card">
+                <div class="kpi-card kpi-duration">
                     <div class="m-lbl">Elapsed Time</div>
                     <div class="m-val" id="kpiDuration">0.0s</div>
                 </div>
@@ -453,45 +526,77 @@
             <div class="bulk-results-card" id="bulkResultsCard">
                 <div class="bulk-toolbar">
                     <div class="filter-group">
-                        <input type="text" id="bulkSearchInput" class="filter-input" placeholder="🔍 Search AWB, Airline, Station (e.g. BOM, LHR, FRA, DXB), Flight..." oninput="renderBulkTable()" />
-                        <select id="bulkStatusFilter" class="filter-select" onchange="renderBulkTable()">
-                            <option value="ALL">All Statuses</option>
-                            <option value="DELIVERED">Delivered (POD)</option>
-                            <option value="IN_TRANSIT">In Transit</option>
-                            <option value="ARRIVED">Arrived</option>
-                            <option value="DEPARTED">Departed</option>
-                            <option value="BOOKED">Booked</option>
-                            <option value="ACCEPTED">Accepted</option>
-                            <option value="NOT_FOUND">Not Found</option>
-                            <option value="UNREACHABLE">Unreachable</option>
-                            <option value="SKIPPED">Skipped (Unsupported Prefix)</option>
-                            <option value="ERROR">Error</option>
-                        </select>
+                        <div class="search-input-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="bulkSearchInput" class="filter-input" placeholder="Search AWB, Airline, Station (e.g. BOM, LHR, FRA, DXB), Flight..." oninput="renderBulkTable()" />
+                            <button id="btnClearSearch" class="btn-clear-search" onclick="clearBulkSearch()" title="Clear search" style="display:none;">&times;</button>
+                        </div>
                     </div>
-                    <div class="export-actions">
-                        <button class="btn-export-excel" onclick="exportBulkExcel()">
-                            <span>📊 Export Excel (.xlsx)</span>
-                        </button>
-                        <button class="btn-export-csv" onclick="exportBulkCsv()">
-                            <span>📄 Export CSV</span>
-                        </button>
+                    <div class="bulk-toolbar-right">
+                        <span class="match-count-badge" id="matchCountBadge">Showing 0 of 0 shipments</span>
+                        <div class="export-actions">
+                            <button class="btn-export-excel" onclick="exportBulkExcel()" title="Export Executive Excel Report (.xlsx)">
+                                <span>📊 Export Excel</span>
+                            </button>
+                            <button class="btn-export-csv" onclick="exportBulkCsv()" title="Export CSV Data (.csv)">
+                                <span>📄 Export CSV</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div style="overflow-x: auto;">
-                    <table>
+                <!-- Quick Status Filter Pills Bar -->
+                <div class="quick-status-pills" id="quickStatusPills">
+                    <button class="pill-filter active" data-filter="ALL" onclick="setQuickStatusFilter('ALL')">
+                        <span>All Shipments</span>
+                        <span class="cnt" id="pillCntAll">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="DELIVERED" onclick="setQuickStatusFilter('DELIVERED')">
+                        <span class="status-dot" style="background:#10b981;"></span>
+                        <span>Delivered</span>
+                        <span class="cnt" id="pillCntDelivered">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="IN_TRANSIT" onclick="setQuickStatusFilter('IN_TRANSIT')">
+                        <span class="status-dot" style="background:#3b82f6;"></span>
+                        <span>In-Transit</span>
+                        <span class="cnt" id="pillCntTransit">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="ARRIVED" onclick="setQuickStatusFilter('ARRIVED')">
+                        <span class="status-dot" style="background:#a855f7;"></span>
+                        <span>Arrived</span>
+                        <span class="cnt" id="pillCntArrived">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="NOT_FOUND" onclick="setQuickStatusFilter('NOT_FOUND')">
+                        <span class="status-dot" style="background:#f43f5e;"></span>
+                        <span>Not Found</span>
+                        <span class="cnt" id="pillCntNotFound">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="SKIPPED" onclick="setQuickStatusFilter('SKIPPED')">
+                        <span class="status-dot" style="background:#94a3b8;"></span>
+                        <span>Skipped</span>
+                        <span class="cnt" id="pillCntSkipped">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="UNREACHABLE" onclick="setQuickStatusFilter('UNREACHABLE')">
+                        <span class="status-dot" style="background:#f59e0b;"></span>
+                        <span>Unreachable</span>
+                        <span class="cnt" id="pillCntUnreachable">0</span>
+                    </button>
+                </div>
+
+                <div class="bulk-table-wrap">
+                    <table class="bulk-table">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>AWB Number</th>
-                                <th>Airline</th>
-                                <th>Status</th>
-                                <th>Origin ➔ Destination</th>
-                                <th>Pieces / Weight</th>
-                                <th>Flight(s)</th>
-                                <th>Latest Activity</th>
-                                <th>Elapsed</th>
-                                <th>Action</th>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th style="width: 165px;">AWB Number</th>
+                                <th style="width: 175px;">Airline Carrier</th>
+                                <th style="width: 140px;">Live Status</th>
+                                <th style="width: 125px;">Route</th>
+                                <th style="width: 145px;">Pieces / Weight</th>
+                                <th style="width: 135px;">Flight(s)</th>
+                                <th>Latest Event / Message</th>
+                                <th style="width: 75px; text-align: right;">Latency</th>
+                                <th style="width: 95px; text-align: center;">Details</th>
                             </tr>
                         </thead>
                         <tbody id="bulkTableBody"></tbody>
@@ -772,32 +877,127 @@
             }
         }
 
+        let activeStatusFilter = 'ALL';
+
+        function setQuickStatusFilter(status) {
+            activeStatusFilter = status;
+            document.querySelectorAll('#quickStatusPills .pill-filter').forEach(btn => {
+                if (btn.getAttribute('data-filter') === status) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            renderBulkTable();
+        }
+
+        function clearBulkSearch() {
+            document.getElementById('bulkSearchInput').value = '';
+            document.getElementById('btnClearSearch').style.display = 'none';
+            renderBulkTable();
+        }
+
+        function copyAwb(awb, btn) {
+            if (!navigator.clipboard) {
+                const ta = document.createElement('textarea');
+                ta.value = awb;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            } else {
+                navigator.clipboard.writeText(awb).catch(() => {});
+            }
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = '<span style="color:#10b981;font-weight:700;font-size:0.75rem;">✓</span>';
+            setTimeout(() => {
+                btn.innerHTML = oldHtml;
+            }, 1200);
+        }
+
+        function getShortCarrierName(fullName, prefix) {
+            if (!fullName) return `Prefix ${prefix}`;
+            const map = {
+                '312': 'IndiGo CarGo',
+                '703': 'Neos Air',
+                '077': 'EgyptAir Cargo',
+                '157': 'Qatar Airways',
+                '932': 'Virgin Atlantic',
+                '125': 'British Airways',
+                '229': 'Kuwait Airways',
+                '176': 'Emirates SkyCargo',
+                '020': 'Lufthansa Cargo',
+                '098': 'Air India Cargo',
+                '065': 'Saudia Cargo',
+                '615': 'DHL Aviation'
+            };
+            if (map[prefix]) return map[prefix];
+            return fullName.replace(/\([A-Z0-9]{2}\)/g, '').replace(/\s*\/\s*.*$/, '').trim();
+        }
+
         function renderBulkTable() {
             const tbody = document.getElementById('bulkTableBody');
-            const searchFilter = (document.getElementById('bulkSearchInput').value || '').toLowerCase().trim();
-            const statusFilter = document.getElementById('bulkStatusFilter').value;
+            const searchInput = document.getElementById('bulkSearchInput');
+            const searchFilter = (searchInput.value || '').toLowerCase().trim();
+            const clearBtn = document.getElementById('btnClearSearch');
+            if (clearBtn) {
+                clearBtn.style.display = searchFilter ? 'inline-block' : 'none';
+            }
+
+            // Update Pill Counts
+            const totalCount = currentBulkRecords.length;
+            const cntDelivered = currentBulkRecords.filter(r => r.status === 'DELIVERED').length;
+            const cntTransit = currentBulkRecords.filter(r => r.status === 'IN_TRANSIT' || r.status === 'DEPARTED').length;
+            const cntArrived = currentBulkRecords.filter(r => r.status === 'ARRIVED').length;
+            const cntNotFound = currentBulkRecords.filter(r => r.status === 'NOT_FOUND').length;
+            const cntSkipped = currentBulkRecords.filter(r => r.status === 'SKIPPED').length;
+            const cntUnreachable = currentBulkRecords.filter(r => r.status === 'UNREACHABLE').length;
+
+            const elAll = document.getElementById('pillCntAll'); if (elAll) elAll.innerText = totalCount;
+            const elDel = document.getElementById('pillCntDelivered'); if (elDel) elDel.innerText = cntDelivered;
+            const elTrn = document.getElementById('pillCntTransit'); if (elTrn) elTrn.innerText = cntTransit;
+            const elArr = document.getElementById('pillCntArrived'); if (elArr) elArr.innerText = cntArrived;
+            const elNf = document.getElementById('pillCntNotFound'); if (elNf) elNf.innerText = cntNotFound;
+            const elSk = document.getElementById('pillCntSkipped'); if (elSk) elSk.innerText = cntSkipped;
+            const elUn = document.getElementById('pillCntUnreachable'); if (elUn) elUn.innerText = cntUnreachable;
 
             tbody.innerHTML = '';
 
             const filtered = currentBulkRecords.filter(r => {
-                if (statusFilter !== 'ALL' && r.status !== statusFilter) {
-                    return false;
-                }
+                // Status Filter
+                if (activeStatusFilter === 'DELIVERED' && r.status !== 'DELIVERED') return false;
+                if (activeStatusFilter === 'IN_TRANSIT' && r.status !== 'IN_TRANSIT' && r.status !== 'DEPARTED') return false;
+                if (activeStatusFilter === 'ARRIVED' && r.status !== 'ARRIVED') return false;
+                if (activeStatusFilter === 'NOT_FOUND' && r.status !== 'NOT_FOUND') return false;
+                if (activeStatusFilter === 'SKIPPED' && r.status !== 'SKIPPED') return false;
+                if (activeStatusFilter === 'UNREACHABLE' && r.status !== 'UNREACHABLE') return false;
+
+                // Search Filter
                 if (searchFilter) {
-                    const combined = `${r.awb} ${r.carrier_name} ${r.origin} ${r.destination} ${r.flight_details} ${r.latest_activity} ${r.status}`.toLowerCase();
+                    const combined = `${r.awb} ${r.carrier_name} ${r.carrier_code} ${r.origin} ${r.destination} ${r.flight_details} ${r.latest_activity} ${r.status_detail} ${r.status}`.toLowerCase();
                     return combined.includes(searchFilter);
                 }
                 return true;
             });
 
+            const matchBadge = document.getElementById('matchCountBadge');
+            if (matchBadge) {
+                matchBadge.innerText = `Showing ${filtered.length} of ${totalCount} shipments`;
+            }
+
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No shipments match your search filter.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 3rem 1rem; color: #64748b; font-size: 0.95rem;">
+                    <div style="font-size: 1.8rem; margin-bottom: 6px;">🔍</div>
+                    <strong>No shipments match your search or filter.</strong>
+                    <div style="font-size: 0.82rem; margin-top: 4px; color: #94a3b8;">Try clearing your search term or clicking 'All Shipments'</div>
+                </td></tr>`;
                 return;
             }
 
             filtered.forEach((r, idx) => {
                 const tr = document.createElement('tr');
-                const stClass = `st-${r.status}`;
+
+                // Carrier Tag
                 let ctClass = 'ct-other';
                 if (r.carrier_prefix === '312') ctClass = 'ct-indigo';
                 else if (r.carrier_prefix === '703') ctClass = 'ct-neos';
@@ -810,28 +1010,130 @@
                 else if (r.carrier_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.carrier_prefix === '098') ctClass = 'ct-airindia';
 
-                const flightBadge = r.flight_details ? `<span class="badge-ev">${r.flight_details}</span>` : '<span style="color:#94a3b8">N/A</span>';
-                const route = (r.origin !== '---' || r.destination !== '---') ? `<strong>${r.origin}</strong> ➔ <strong>${r.destination}</strong>` : '<span style="color:#94a3b8">---</span>';
-                const weightPcs = `${r.pieces ? r.pieces + ' pcs' : ''} ${r.weight ? '/ ' + r.weight : ''}`.trim() || '<span style="color:#94a3b8">---</span>';
+                const shortName = getShortCarrierName(r.carrier_name, r.carrier_prefix);
+                const carrierHtml = `
+                    <div class="carrier-chip ${ctClass}" title="${r.carrier_name}">
+                        <span class="prefix-chip">${r.carrier_code || r.carrier_prefix}</span>
+                        <span>${shortName}</span>
+                    </div>
+                `;
 
-                let statusIcon = '';
-                if (r.status === 'DELIVERED') statusIcon = '✔ ';
-                else if (r.status === 'SKIPPED') statusIcon = '⏭ ';
-                else if (r.status === 'UNREACHABLE') statusIcon = '🔌 ';
-                else if (r.status === 'NOT_FOUND') statusIcon = '✖ ';
+                // Status Badge
+                let statusHtml = '';
+                if (r.status === 'DELIVERED') {
+                    statusHtml = `<span class="badge-status bs-delivered"><span class="status-dot"></span>Delivered</span>`;
+                } else if (r.status === 'IN_TRANSIT') {
+                    statusHtml = `<span class="badge-status bs-transit"><span class="status-dot"></span>In Transit</span>`;
+                } else if (r.status === 'DEPARTED') {
+                    statusHtml = `<span class="badge-status bs-departed"><span class="status-dot"></span>Departed</span>`;
+                } else if (r.status === 'ARRIVED') {
+                    statusHtml = `<span class="badge-status bs-arrived"><span class="status-dot"></span>Arrived</span>`;
+                } else if (r.status === 'BOOKED' || r.status === 'ACCEPTED') {
+                    statusHtml = `<span class="badge-status bs-booked"><span class="status-dot"></span>${r.status}</span>`;
+                } else if (r.status === 'NOT_FOUND') {
+                    statusHtml = `<span class="badge-status bs-notfound"><span class="status-dot"></span>Not Found</span>`;
+                } else if (r.status === 'SKIPPED') {
+                    statusHtml = `<span class="badge-status bs-skipped"><span class="status-dot"></span>Skipped</span>`;
+                } else if (r.status === 'UNREACHABLE') {
+                    statusHtml = `<span class="badge-status bs-unreachable"><span class="status-dot"></span>Unreachable</span>`;
+                } else {
+                    statusHtml = `<span class="badge-status bs-error"><span class="status-dot"></span>${r.status}</span>`;
+                }
 
+                // Route Chips
+                let routeHtml = '<span style="color:#94a3b8; font-size:0.85rem;">---</span>';
+                if (r.origin && r.origin !== '---' && r.destination && r.destination !== '---') {
+                    const origClean = r.origin.split(',')[0].trim().toUpperCase();
+                    const destClean = r.destination.split(',')[0].trim().toUpperCase();
+                    routeHtml = `
+                        <div class="route-pill-box" title="${r.origin} ➔ ${r.destination}">
+                            <span class="apt-code">${origClean}</span>
+                            <span class="route-arrow">➔</span>
+                            <span class="apt-code">${destClean}</span>
+                        </div>
+                    `;
+                }
+
+                // Pieces & Weight
+                let pwHtml = '<span style="color:#94a3b8; font-size:0.85rem;">---</span>';
+                const pwItems = [];
+                if (r.pieces) {
+                    pwItems.push(`<span class="pw-badge"><strong>${r.pieces}</strong> pcs</span>`);
+                }
+                if (r.weight) {
+                    const cleanWt = String(r.weight).replace(/kgs|kg/gi, '').trim();
+                    pwItems.push(`<span class="pw-badge"><strong>${cleanWt}</strong> kg</span>`);
+                }
+                if (pwItems.length > 0) {
+                    pwHtml = `<div class="pw-pill-box">${pwItems.join('')}</div>`;
+                }
+
+                // Flights (Deduplicated Chips)
+                let flightHtml = '<span style="color:#94a3b8; font-size:0.82rem;">N/A</span>';
+                if (r.flight_details) {
+                    const rawList = r.flight_details.split(',').map(s => s.trim()).filter(Boolean);
+                    const uniq = [...new Set(rawList)];
+                    if (uniq.length > 0) {
+                        const top2 = uniq.slice(0, 2);
+                        const rest = uniq.length - 2;
+                        flightHtml = `<div class="flight-chips-wrap">` +
+                            top2.map(f => `<span class="fl-chip">${f}</span>`).join('') +
+                            (rest > 0 ? `<span class="fl-chip fl-chip-more" title="${uniq.slice(2).join(', ')}">+${rest}</span>` : '') +
+                            `</div>`;
+                    }
+                }
+
+                // Latest Message / Detail Cell
+                let msgHtml = '';
+                if (r.status === 'SKIPPED') {
+                    msgHtml = `
+                        <div>
+                            <span class="note-skipped">Unsupported Prefix (${r.carrier_prefix})</span>
+                            <div class="msg-clamp" title="${r.status_detail}">${r.carrier_name}</div>
+                        </div>
+                    `;
+                } else if (r.status === 'NOT_FOUND') {
+                    msgHtml = `
+                        <div>
+                            <span class="note-notfound">Record Not Found</span>
+                            <div class="msg-clamp" title="${r.status_detail}">AWB does not exist on carrier portal</div>
+                        </div>
+                    `;
+                } else if (r.status === 'UNREACHABLE') {
+                    msgHtml = `
+                        <div>
+                            <span class="note-unreachable">Connection Timeout</span>
+                            <div class="msg-clamp" title="${r.error_message || r.status_detail}">Carrier portal timed out</div>
+                        </div>
+                    `;
+                } else {
+                    const text = r.latest_activity || r.status_detail || '---';
+                    msgHtml = `<div class="msg-clamp" title="${text}">${text}</div>`;
+                }
+
+                // Row InnerHTML
                 tr.innerHTML = `
-                    <td style="color: #64748b; font-weight: 600;">${idx + 1}</td>
-                    <td><strong style="font-family: monospace; font-size: 0.95rem;">${r.awb}</strong></td>
-                    <td><span class="carrier-tag ${ctClass}">${r.carrier_name}</span></td>
-                    <td><span class="status-badge ${stClass}">${statusIcon}${r.status}</span></td>
-                    <td>${route}</td>
-                    <td>${weightPcs}</td>
-                    <td>${flightBadge}</td>
-                    <td style="max-width: 250px; font-size: 0.85rem;" title="${r.latest_activity || r.status_detail}">${r.latest_activity || r.status_detail || '---'}</td>
-                    <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">${r.execution_time_sec}s</td>
+                    <td style="text-align: center; color: #64748b; font-weight: 600; font-size: 0.82rem;">${idx + 1}</td>
                     <td>
-                        <button class="btn-inspect" onclick="inspectShipment('${r.awb}')">👁 Inspect</button>
+                        <div class="cell-awb-wrap">
+                            <span class="awb-code">${r.awb}</span>
+                            <button class="btn-copy-mini" onclick="copyAwb('${r.awb}', this)" title="Copy AWB Number">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                    </td>
+                    <td>${carrierHtml}</td>
+                    <td>${statusHtml}</td>
+                    <td>${routeHtml}</td>
+                    <td>${pwHtml}</td>
+                    <td>${flightHtml}</td>
+                    <td class="msg-cell">${msgHtml}</td>
+                    <td style="text-align: right; font-size: 0.8rem; color: #64748b; font-family: 'JetBrains Mono', monospace; white-space: nowrap;">${r.execution_time_sec}s</td>
+                    <td style="text-align: center;">
+                        <button class="btn-inspect-premium" onclick="inspectShipment('${r.awb}')" title="View Detailed Milestone Plan">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Inspect</span>
+                        </button>
                     </td>
                 `;
                 tbody.appendChild(tr);

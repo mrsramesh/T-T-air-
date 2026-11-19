@@ -94,7 +94,18 @@ class CarrierDataNormalizer:
     def normalize_cargoflash(cls, res: Any, raw_input: str, elapsed_sec: float) -> UnifiedTrackingRecord:
         ov = res.overview
         status_category = cls._classify_status(ov.latest_event_action)
-        fl_str = ", ".join(f"{f.flight_no} ({f.flight_date})" for f in res.flight_details if getattr(f, "flight_no", None)) if res.flight_details else None
+        # Deduplicate flight numbers so repeated milestone legs don't create duplicate entries
+        unique_flights = []
+        if res.flight_details:
+            seen_f = set()
+            for f in res.flight_details:
+                f_no = getattr(f, "flight_no", None)
+                if f_no:
+                    f_clean = f_no.strip()
+                    if f_clean not in seen_f:
+                        seen_f.add(f_clean)
+                        unique_flights.append(f_clean)
+        fl_str = ", ".join(unique_flights) if unique_flights else None
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         return UnifiedTrackingRecord(
             awb=ov.formatted_awb,
@@ -153,7 +164,7 @@ class CarrierDataNormalizer:
         status_category = cls._classify_status(ov.order_status)
         orig_code = ov.origin.code if hasattr(ov.origin, "code") else str(ov.origin)
         dest_code = ov.destination.code if hasattr(ov.destination, "code") else str(ov.destination)
-        fl_str = ", ".join(f.flight_number for f in res.flights if getattr(f, "flight_number", None)) if res.flights else None
+        fl_str = ", ".join(dict.fromkeys(f.flight_number.strip() for f in res.flights if getattr(f, "flight_number", None))) if res.flights else None
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         return UnifiedTrackingRecord(
             awb=ov.formatted_awb,
@@ -182,8 +193,10 @@ class CarrierDataNormalizer:
         ov = res.overview
         status_category = cls._classify_status(ov.latest_status)
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
-        orig = ov.origin_location or ov.origin_country or "---"
-        dest = ov.destination_location or ov.destination_country or "---"
+        orig_raw = ov.origin_location or ov.origin_country or "---"
+        dest_raw = ov.destination_location or ov.destination_country or "---"
+        orig = orig_raw.split(',')[0].strip() if orig_raw != "---" else "---"
+        dest = dest_raw.split(',')[0].strip() if dest_raw != "---" else "---"
         formatted_awb = getattr(ov, "formatted_tracking_number", getattr(res, "formatted_tracking_number", getattr(ov, "formatted_awb", raw_input)))
         pcs_val = None
         if ov.pieces:
@@ -219,7 +232,7 @@ class CarrierDataNormalizer:
     def normalize_kuwait(cls, res: Any, raw_input: str, elapsed_sec: float) -> UnifiedTrackingRecord:
         ov = res.overview
         status_category = cls._classify_status(ov.current_status)
-        fl_str = ", ".join(f.flight_number for f in res.flights if getattr(f, "flight_number", None)) if res.flights else None
+        fl_str = ", ".join(dict.fromkeys(f.flight_number.strip() for f in res.flights if getattr(f, "flight_number", None))) if res.flights else None
         lat_act = res.operational_events[0].status_name if res.operational_events else ov.current_status
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         return UnifiedTrackingRecord(
@@ -281,7 +294,7 @@ class CarrierDataNormalizer:
         status_category = cls._classify_status(ov.latest_event)
         orig_code = ov.origin.code if hasattr(ov.origin, "code") else str(ov.origin)
         dest_code = ov.destination.code if hasattr(ov.destination, "code") else str(ov.destination)
-        fl_str = ", ".join(f.flight_number for f in res.flights if getattr(f, "flight_number", None)) if res.flights else None
+        fl_str = ", ".join(dict.fromkeys(f.flight_number.strip() for f in res.flights if getattr(f, "flight_number", None))) if res.flights else None
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         return UnifiedTrackingRecord(
             awb=ov.formatted_awb,
@@ -309,7 +322,7 @@ class CarrierDataNormalizer:
     def normalize_airindia(cls, res: Any, raw_input: str, elapsed_sec: float) -> UnifiedTrackingRecord:
         ov = res.overview
         status_category = cls._classify_status(ov.overall_status)
-        fl_str = ", ".join(f"AI {s.flight_number}" for s in res.tracking_view if getattr(s, "flight_number", None)) if res.tracking_view else None
+        fl_str = ", ".join(dict.fromkeys(f"AI {s.flight_number}".strip() for s in res.tracking_view if getattr(s, "flight_number", None))) if res.tracking_view else None
         raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
         return UnifiedTrackingRecord(
             awb=ov.formatted_awb,
