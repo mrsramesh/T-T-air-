@@ -574,6 +574,84 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertIn("DHL Aviation", rec2.carrier_name)
         self.assertIn("Skipped", rec2.status_detail)
 
+    def test_master_ledger_persistence_and_no_duplicates(self):
+        import tempfile
+        from pathlib import Path
+        from bulk_tracker.ledger import MasterLedgerManager
+        from bulk_tracker.models import UnifiedTrackingRecord
+
+        with tempfile.TemporaryDirectory() as td:
+            db_path = Path(td) / "test_ledger.db"
+            ledger = MasterLedgerManager(db_path)
+
+            rec = UnifiedTrackingRecord(
+                awb="077-59068973",
+                raw_input="077-59068973",
+                carrier_prefix="077",
+                carrier_name="EgyptAir Cargo (MS)",
+                carrier_code="MS",
+                status="IN_TRANSIT",
+                status_detail="In Flight to CAI",
+                origin="DEL",
+                destination="LHR",
+                pieces=3,
+                weight="304.00 kg",
+                consignee_issued_to="Global Freight Forwarder",
+            )
+
+            # Insert 1
+            ledger.upsert_record(rec)
+            rows = ledger.get_all_records()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["customer_name"], "Global Freight Forwarder")
+            self.assertEqual(rows[0]["status"], "IN_TRANSIT")
+            self.assertEqual(rows[0]["tracked_count"], 1)
+
+            # Update to DELIVERED (same AWB)
+            rec.status = "DELIVERED"
+            rec.status_detail = "Delivered at LHR"
+            ledger.upsert_record(rec)
+
+            rows_after = ledger.get_all_records()
+            self.assertEqual(len(rows_after), 1, "Duplicate row was created!")
+            self.assertEqual(rows_after[0]["status"], "DELIVERED")
+            self.assertEqual(rows_after[0]["tracked_count"], 2)
+
+            # Verify Excel and CSV export
+            excel_bytes = ledger.export_excel()
+            self.assertGreater(len(excel_bytes), 2000)
+
+            csv_text = ledger.export_csv()
+            self.assertIn("077-59068973", csv_text)
+            self.assertIn("Global Freight Forwarder", csv_text)
+
+    def test_master_ledger_api_endpoints(self):
+        from fastapi.testclient import TestClient
+        import server
+
+        client = TestClient(server.app)
+
+        # Verify ledger GET endpoint
+        res = client.get("/api/v1/ledger")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("stats", data)
+        self.assertIn("records", data)
+
+        # Verify stats endpoint
+        res_stats = client.get("/api/v1/ledger/stats")
+        self.assertEqual(res_stats.status_code, 200)
+
+        # Verify Excel export endpoint
+        res_excel = client.get("/api/v1/ledger/export/excel")
+        self.assertEqual(res_excel.status_code, 200)
+        self.assertIn("spreadsheetml", res_excel.headers["content-type"])
+
+        # Verify CSV export endpoint
+        res_csv = client.get("/api/v1/ledger/export/csv")
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertIn("text/csv", res_csv.headers["content-type"])
+
     def test_unreachable_portal_flagging(self):
         tracker = BulkCargoTracker(max_global_workers=1)
         err_rec = CarrierDataNormalizer.create_error_record(

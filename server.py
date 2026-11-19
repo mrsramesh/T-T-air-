@@ -37,6 +37,8 @@ from bulk_tracker import (
     CSVReportExporter,
     BulkTrackingSummary,
     UnifiedTrackingRecord,
+    MasterLedgerManager,
+    master_ledger,
 )
 
 app = FastAPI(
@@ -139,6 +141,14 @@ def track_shipment(
     """
     target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels") else detect_carrier(awb)
 
+    # Automatically record & update in Master Ledger
+    try:
+        s_rec = bulk_tracker.track_single(awb)
+        if s_rec:
+            master_ledger.upsert_record(s_rec)
+    except Exception:
+        pass
+
     try:
         if target_carrier in ("indigo", "6e", "indigocargo"):
             res = indigo_client.track(awb)
@@ -231,6 +241,8 @@ def track_bulk_shipments(payload: BulkTrackPayload):
 
     engine = BulkCargoTracker(max_global_workers=payload.workers or 5)
     summary = engine.track_batch(unique_awbs)
+    # Automatically persist/update master ledger without duplicates
+    master_ledger.upsert_batch(summary.records)
     return summary.model_dump()
 
 
@@ -251,6 +263,8 @@ async def track_uploaded_file(file: UploadFile = File(...), workers: int = Query
 
     engine = BulkCargoTracker(max_global_workers=workers)
     summary = engine.track_batch(unique_awbs)
+    # Automatically persist/update master ledger without duplicates
+    master_ledger.upsert_batch(summary.records)
     return summary.model_dump()
 
 
@@ -279,6 +293,73 @@ def export_csv_report(payload: ExportPayload):
         content=csv_bytes,
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=AirCargo_Shipments_Tracking.csv"},
+    )
+
+
+# =========================================================================
+# Master Cargo Ledger & Permanent Storage Endpoints
+# =========================================================================
+
+@app.get("/api/v1/ledger", tags=["Master Ledger"])
+def get_master_ledger(
+    search: Optional[str] = Query(None, description="Search by AWB, Customer, Airline, Station, Flight, etc."),
+    status: Optional[str] = Query("ALL", description="Filter by status: ALL, DELIVERED, IN_TRANSIT, ARRIVED, etc."),
+    limit: int = Query(1000, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
+):
+    """
+    Retrieve master persistent air cargo ledger records.
+    Every AWB tracked is permanently saved without duplicates and updated in place.
+    """
+    records = master_ledger.get_all_records(search=search, status=status, limit=limit, offset=offset)
+    stats = master_ledger.get_summary_stats()
+    return {
+        "stats": stats,
+        "total_matched": len(records),
+        "records": records,
+    }
+
+
+@app.get("/api/v1/ledger/stats", tags=["Master Ledger"])
+def get_ledger_stats():
+    """Retrieve aggregate statistics for the Master Cargo Ledger."""
+    return master_ledger.get_summary_stats()
+
+
+@app.get("/api/v1/ledger/export/excel", tags=["Master Ledger"])
+def export_ledger_excel(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query("ALL"),
+):
+    """
+    Download the complete Master Air Cargo Ledger as a beautifully formatted Excel (.xlsx) sheet.
+    Columns: Customer Name, AWB No, Package, Gross Weight, Volume Weight, IATA, Flight Code, Source, Destination, Direction in Transition, Status of AWB.
+    """
+    from datetime import datetime
+    records = master_ledger.get_all_records(search=search, status=status, limit=10000)
+    excel_bytes = master_ledger.export_excel(records)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=AirCargo_Master_Ledger_{datetime.now().strftime('%Y%m%d')}.xlsx"},
+    )
+
+
+@app.get("/api/v1/ledger/export/csv", tags=["Master Ledger"])
+def export_ledger_csv(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query("ALL"),
+):
+    """
+    Download the complete Master Air Cargo Ledger as a CSV file.
+    """
+    from datetime import datetime
+    records = master_ledger.get_all_records(search=search, status=status, limit=10000)
+    csv_str = master_ledger.export_csv(records)
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=AirCargo_Master_Ledger_{datetime.now().strftime('%Y%m%d')}.csv"},
     )
 
 

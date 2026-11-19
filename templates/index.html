@@ -292,6 +292,9 @@
                 <button id="btnModeBulk" class="mode-btn" onclick="switchDashboardMode('bulk')">
                     ⚡ Bulk & Multi-AWB Engine (Batch & Excel)
                 </button>
+                <button id="btnModeLedger" class="mode-btn" onclick="switchDashboardMode('ledger')">
+                    📋 Master Cargo Sheet (Historical Ledger) <span id="navLedgerBadge" style="background:#0f172a;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.75rem;margin-left:6px;font-family:'JetBrains Mono',monospace;">0</span>
+                </button>
             </div>
             <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 10-Carrier Tracking & Anti-Bot Protection</div>
         </div>
@@ -607,6 +610,146 @@
 
     </div>
 
+        <!-- ================= SECTION 3: MASTER AIR CARGO LEDGER SHEET ================= -->
+        <div id="masterLedgerSection" style="display: none;">
+            
+            <!-- Master Info Banner -->
+            <div style="background: white; border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid var(--border); margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <div>
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                        <span>📋 Master Air Cargo Sheet & Persistent Historical Ledger</span>
+                    </h2>
+                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                        Continuous, permanent database of every searched AWB across all 10 airlines. <strong>Zero duplicates</strong> — updates are applied in place with complete lifecycle history.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-export-excel" onclick="downloadMasterExcel()" title="Download Full Master Excel Workbook (.xlsx)">
+                        <span>📊 Download Master Excel (.xlsx)</span>
+                    </button>
+                    <button class="btn-export-csv" onclick="downloadMasterCsv()" title="Download Full Master CSV (.csv)">
+                        <span>📄 Download CSV</span>
+                    </button>
+                    <button class="btn-inspect-premium" onclick="loadMasterLedger()" title="Refresh database records" style="padding: 0.65rem 1rem;">
+                        <span>🔄 Refresh</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Master KPI Metrics Row -->
+            <div class="kpi-row" id="masterKpiRow">
+                <div class="kpi-card kpi-total">
+                    <div class="m-lbl">Unique AWBs Stored</div>
+                    <div class="m-val" id="masterKpiTotal">0</div>
+                </div>
+                <div class="kpi-card kpi-success">
+                    <div class="m-lbl">Delivered (POD)</div>
+                    <div class="m-val" id="masterKpiDelivered">0</div>
+                </div>
+                <div class="kpi-card kpi-transit">
+                    <div class="m-lbl">In-Transit / Dep</div>
+                    <div class="m-val" id="masterKpiTransit">0</div>
+                </div>
+                <div class="kpi-card kpi-arrived">
+                    <div class="m-lbl">Arrived at Dest</div>
+                    <div class="m-val" id="masterKpiArrived">0</div>
+                </div>
+                <div class="kpi-card kpi-failed">
+                    <div class="m-lbl">Not Found</div>
+                    <div class="m-val" id="masterKpiNotFound">0</div>
+                </div>
+                <div class="kpi-card kpi-skipped">
+                    <div class="m-lbl">Skipped (Prefix)</div>
+                    <div class="m-val" id="masterKpiSkipped">0</div>
+                </div>
+                <div class="kpi-card kpi-duration">
+                    <div class="m-lbl">Airlines Covered</div>
+                    <div class="m-val" id="masterKpiCarriers">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="m-lbl">Last Sync Time</div>
+                    <div class="m-val" id="masterKpiLastSync" style="font-size: 1.05rem;">N/A</div>
+                </div>
+            </div>
+
+            <!-- Master Table Card -->
+            <div class="bulk-results-card" style="display: block;">
+                <!-- Toolbar -->
+                <div class="bulk-toolbar">
+                    <div class="filter-group">
+                        <div class="search-input-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="ledgerSearchInput" class="filter-input" placeholder="Search Customer Name, AWB, Airline, Station (e.g. BOM, LHR, FRA), Flight..." oninput="filterMasterLedgerTable()" />
+                            <button id="btnLedgerClearSearch" class="btn-clear-search" onclick="clearLedgerSearch()" title="Clear search" style="display:none;">&times;</button>
+                        </div>
+                    </div>
+                    <div class="bulk-toolbar-right">
+                        <span class="match-count-badge" id="ledgerMatchBadge">Showing 0 of 0 records</span>
+                    </div>
+                </div>
+
+                <!-- Quick Status Filter Pills -->
+                <div class="quick-status-pills" id="ledgerStatusPills">
+                    <button class="pill-filter active" data-filter="ALL" onclick="setLedgerStatusFilter('ALL')">
+                        <span>All Shipments</span>
+                        <span class="cnt" id="ledgerPillTot">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="DELIVERED" onclick="setLedgerStatusFilter('DELIVERED')">
+                        <span class="status-dot" style="background:#10b981;"></span>
+                        <span>Delivered</span>
+                        <span class="cnt" id="ledgerPillDel">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="IN_TRANSIT" onclick="setLedgerStatusFilter('IN_TRANSIT')">
+                        <span class="status-dot" style="background:#3b82f6;"></span>
+                        <span>In-Transit</span>
+                        <span class="cnt" id="ledgerPillTrn">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="ARRIVED" onclick="setLedgerStatusFilter('ARRIVED')">
+                        <span class="status-dot" style="background:#a855f7;"></span>
+                        <span>Arrived</span>
+                        <span class="cnt" id="ledgerPillArr">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="NOT_FOUND" onclick="setLedgerStatusFilter('NOT_FOUND')">
+                        <span class="status-dot" style="background:#f43f5e;"></span>
+                        <span>Not Found</span>
+                        <span class="cnt" id="ledgerPillNf">0</span>
+                    </button>
+                    <button class="pill-filter" data-filter="SKIPPED" onclick="setLedgerStatusFilter('SKIPPED')">
+                        <span class="status-dot" style="background:#94a3b8;"></span>
+                        <span>Skipped</span>
+                        <span class="cnt" id="ledgerPillSk">0</span>
+                    </button>
+                </div>
+
+                <!-- Table -->
+                <div class="bulk-table-wrap">
+                    <table class="bulk-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th style="width: 175px;">Customer Name</th>
+                                <th style="width: 155px;">AWB No</th>
+                                <th style="width: 110px;">Package</th>
+                                <th style="width: 120px;">Gross Weight</th>
+                                <th style="width: 110px;">Volume Wt</th>
+                                <th style="width: 170px;">IATA / Airline</th>
+                                <th style="width: 130px;">Flight Code</th>
+                                <th style="width: 115px;">Source ➔ Dest</th>
+                                <th style="width: 185px;">Direction in Transition</th>
+                                <th style="width: 135px;">Status of AWB</th>
+                                <th>Latest Activity / Detail</th>
+                                <th style="width: 130px;">Last Updated</th>
+                                <th style="width: 75px; text-align: center;">Tracked</th>
+                                <th style="width: 90px; text-align: center;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="masterLedgerTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
     <!-- ================= SHIPMENT INSPECTION MODAL ================= -->
     <div class="modal-overlay" id="shipmentModalOverlay" onclick="if(event.target === this) closeModal()">
         <div class="modal-wrap">
@@ -681,19 +824,29 @@
         function switchDashboardMode(mode) {
             const btnSingle = document.getElementById('btnModeSingle');
             const btnBulk = document.getElementById('btnModeBulk');
+            const btnLedger = document.getElementById('btnModeLedger');
             const secSingle = document.getElementById('singleTrackerSection');
             const secBulk = document.getElementById('bulkTrackerSection');
+            const secLedger = document.getElementById('masterLedgerSection');
+
+            btnSingle.classList.remove('active');
+            btnBulk.classList.remove('active');
+            if (btnLedger) btnLedger.classList.remove('active');
+
+            secSingle.style.display = 'none';
+            secBulk.style.display = 'none';
+            if (secLedger) secLedger.style.display = 'none';
 
             if (mode === 'bulk') {
-                btnSingle.classList.remove('active');
                 btnBulk.classList.add('active');
-                secSingle.style.display = 'none';
                 secBulk.style.display = 'block';
                 logTerminal('Switched view to Bulk & Multi-AWB Engine.', 'info');
+            } else if (mode === 'ledger') {
+                if (btnLedger) btnLedger.classList.add('active');
+                if (secLedger) secLedger.style.display = 'block';
+                loadMasterLedger();
             } else {
-                btnBulk.classList.remove('active');
                 btnSingle.classList.add('active');
-                secBulk.style.display = 'none';
                 secSingle.style.display = 'block';
                 logTerminal('Switched view to Single AWB Tracker.', 'info');
             }
@@ -1139,6 +1292,260 @@
                 tbody.appendChild(tr);
             });
         }
+
+        // =========================================================================
+        // Master Cargo Ledger & Persistent Sheet Logic
+        // =========================================================================
+        let masterLedgerData = [];
+        let activeLedgerStatus = 'ALL';
+
+        async function loadMasterLedger() {
+            const tbody = document.getElementById('masterLedgerTableBody');
+            if (!tbody) return;
+
+            try {
+                const params = new URLSearchParams();
+                if (activeLedgerStatus !== 'ALL') params.append('status', activeLedgerStatus);
+                params.append('limit', '5000');
+
+                const res = await fetch(`/api/v1/ledger?${params.toString()}`);
+                if (!res.ok) throw new Error("Failed to fetch master ledger");
+                const data = await res.json();
+
+                masterLedgerData = data.records || [];
+                const stats = data.stats || {};
+
+                // Update KPI Cards
+                const elTot = document.getElementById('masterKpiTotal'); if (elTot) elTot.innerText = stats.total_records ?? 0;
+                const elDel = document.getElementById('masterKpiDelivered'); if (elDel) elDel.innerText = stats.delivered ?? 0;
+                const elTrn = document.getElementById('masterKpiTransit'); if (elTrn) elTrn.innerText = stats.in_transit ?? 0;
+                const elArr = document.getElementById('masterKpiArrived'); if (elArr) elArr.innerText = stats.arrived ?? 0;
+                const elNf = document.getElementById('masterKpiNotFound'); if (elNf) elNf.innerText = stats.not_found ?? 0;
+                const elSk = document.getElementById('masterKpiSkipped'); if (elSk) elSk.innerText = stats.skipped ?? 0;
+                const elCar = document.getElementById('masterKpiCarriers'); if (elCar) elCar.innerText = stats.unique_carriers ?? 0;
+                const elSync = document.getElementById('masterKpiLastSync'); if (elSync) elSync.innerText = stats.last_sync ? (stats.last_sync.split(' ')[1] || stats.last_sync) : 'N/A';
+
+                // Update Nav Badge
+                const navBadge = document.getElementById('navLedgerBadge');
+                if (navBadge) navBadge.innerText = stats.total_records ?? 0;
+
+                // Update Status Pill Counts
+                const pTot = document.getElementById('ledgerPillTot'); if (pTot) pTot.innerText = stats.total_records ?? 0;
+                const pDel = document.getElementById('ledgerPillDel'); if (pDel) pDel.innerText = stats.delivered ?? 0;
+                const pTrn = document.getElementById('ledgerPillTrn'); if (pTrn) pTrn.innerText = stats.in_transit ?? 0;
+                const pArr = document.getElementById('ledgerPillArr'); if (pArr) pArr.innerText = stats.arrived ?? 0;
+                const pNf = document.getElementById('ledgerPillNf'); if (pNf) pNf.innerText = stats.not_found ?? 0;
+                const pSk = document.getElementById('ledgerPillSk'); if (pSk) pSk.innerText = stats.skipped ?? 0;
+
+                renderMasterLedgerTable();
+            } catch (err) {
+                console.error("Master ledger error:", err);
+                tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 2rem; color: #dc2626;">Failed to load master ledger: ${err.message}</td></tr>`;
+            }
+        }
+
+        function setLedgerStatusFilter(st) {
+            activeLedgerStatus = st;
+            document.querySelectorAll('#ledgerStatusPills .pill-filter').forEach(btn => {
+                if (btn.getAttribute('data-filter') === st) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            renderMasterLedgerTable();
+        }
+
+        function clearLedgerSearch() {
+            document.getElementById('ledgerSearchInput').value = '';
+            document.getElementById('btnLedgerClearSearch').style.display = 'none';
+            renderMasterLedgerTable();
+        }
+
+        function filterMasterLedgerTable() {
+            const input = document.getElementById('ledgerSearchInput');
+            const clearBtn = document.getElementById('btnLedgerClearSearch');
+            if (clearBtn) {
+                clearBtn.style.display = input.value ? 'inline-block' : 'none';
+            }
+            renderMasterLedgerTable();
+        }
+
+        function renderMasterLedgerTable() {
+            const tbody = document.getElementById('masterLedgerTableBody');
+            if (!tbody) return;
+
+            const searchVal = (document.getElementById('ledgerSearchInput')?.value || '').toLowerCase().trim();
+
+            const filtered = masterLedgerData.filter(r => {
+                // Status Filter
+                if (activeLedgerStatus === 'DELIVERED' && r.status !== 'DELIVERED') return false;
+                if (activeLedgerStatus === 'IN_TRANSIT' && r.status !== 'IN_TRANSIT' && r.status !== 'DEPARTED') return false;
+                if (activeLedgerStatus === 'ARRIVED' && r.status !== 'ARRIVED') return false;
+                if (activeLedgerStatus === 'NOT_FOUND' && r.status !== 'NOT_FOUND') return false;
+                if (activeLedgerStatus === 'SKIPPED' && r.status !== 'SKIPPED') return false;
+
+                // Search Filter
+                if (searchVal) {
+                    const combined = `${r.customer_name} ${r.awb_no} ${r.carrier_name} ${r.iata} ${r.flight_code} ${r.source} ${r.destination} ${r.direction_transition} ${r.status} ${r.latest_activity}`.toLowerCase();
+                    return combined.includes(searchVal);
+                }
+                return true;
+            });
+
+            const matchBadge = document.getElementById('ledgerMatchBadge');
+            if (matchBadge) {
+                matchBadge.innerText = `Showing ${filtered.length} of ${masterLedgerData.length} records`;
+            }
+
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+                    <div style="font-size: 1.8rem; margin-bottom: 6px;">📂</div>
+                    <strong>No master records match your search filter.</strong>
+                    <div style="font-size: 0.82rem; margin-top: 4px; color: #94a3b8;">Try clearing search or tracking new AWBs from Single/Bulk Tracker.</div>
+                </td></tr>`;
+                return;
+            }
+
+            filtered.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+
+                // Carrier Tag
+                let ctClass = 'ct-other';
+                if (r.iata_prefix === '312') ctClass = 'ct-indigo';
+                else if (r.iata_prefix === '703') ctClass = 'ct-neos';
+                else if (r.iata_prefix === '077') ctClass = 'ct-cargoflash';
+                else if (r.iata_prefix === '157') ctClass = 'ct-qatar';
+                else if (r.iata_prefix === '932') ctClass = 'ct-virgin';
+                else if (r.iata_prefix === '125') ctClass = 'ct-britishairways';
+                else if (r.iata_prefix === '229') ctClass = 'ct-kuwait';
+                else if (r.iata_prefix === '176') ctClass = 'ct-emirates';
+                else if (r.iata_prefix === '020') ctClass = 'ct-lufthansa';
+                else if (r.iata_prefix === '098') ctClass = 'ct-airindia';
+
+                const shortName = getShortCarrierName(r.carrier_name, r.iata_prefix);
+                const carrierHtml = `
+                    <div class="carrier-chip ${ctClass}" title="${r.carrier_name}">
+                        <span class="prefix-chip">${r.carrier_code || r.iata_prefix}</span>
+                        <span>${shortName}</span>
+                    </div>
+                `;
+
+                // Status Badge
+                let statusHtml = '';
+                if (r.status === 'DELIVERED') {
+                    statusHtml = `<span class="badge-status bs-delivered"><span class="status-dot"></span>Delivered</span>`;
+                } else if (r.status === 'IN_TRANSIT') {
+                    statusHtml = `<span class="badge-status bs-transit"><span class="status-dot"></span>In Transit</span>`;
+                } else if (r.status === 'DEPARTED') {
+                    statusHtml = `<span class="badge-status bs-departed"><span class="status-dot"></span>Departed</span>`;
+                } else if (r.status === 'ARRIVED') {
+                    statusHtml = `<span class="badge-status bs-arrived"><span class="status-dot"></span>Arrived</span>`;
+                } else if (r.status === 'BOOKED' || r.status === 'ACCEPTED') {
+                    statusHtml = `<span class="badge-status bs-booked"><span class="status-dot"></span>${r.status}</span>`;
+                } else if (r.status === 'NOT_FOUND') {
+                    statusHtml = `<span class="badge-status bs-notfound"><span class="status-dot"></span>Not Found</span>`;
+                } else if (r.status === 'SKIPPED') {
+                    statusHtml = `<span class="badge-status bs-skipped"><span class="status-dot"></span>Skipped</span>`;
+                } else if (r.status === 'UNREACHABLE') {
+                    statusHtml = `<span class="badge-status bs-unreachable"><span class="status-dot"></span>Unreachable</span>`;
+                } else {
+                    statusHtml = `<span class="badge-status bs-error"><span class="status-dot"></span>${r.status}</span>`;
+                }
+
+                // Flight Code Chips
+                let flightHtml = '<span style="color:#94a3b8; font-size:0.82rem;">---</span>';
+                if (r.flight_code && r.flight_code !== '---') {
+                    const rawList = r.flight_code.split(',').map(s => s.trim()).filter(Boolean);
+                    const uniq = [...new Set(rawList)];
+                    if (uniq.length > 0) {
+                        const top2 = uniq.slice(0, 2);
+                        const rest = uniq.length - 2;
+                        flightHtml = `<div class="flight-chips-wrap">` +
+                            top2.map(f => `<span class="fl-chip">${f}</span>`).join('') +
+                            (rest > 0 ? `<span class="fl-chip fl-chip-more" title="${uniq.slice(2).join(', ')}">+${rest}</span>` : '') +
+                            `</div>`;
+                    }
+                }
+
+                // Route Chips
+                let routeHtml = '<span style="color:#94a3b8; font-size:0.85rem;">---</span>';
+                if (r.source && r.source !== '---' && r.destination && r.destination !== '---') {
+                    const sClean = r.source.split(',')[0].trim().toUpperCase();
+                    const dClean = r.destination.split(',')[0].trim().toUpperCase();
+                    routeHtml = `
+                        <div class="route-pill-box" title="${r.source} ➔ ${r.destination}">
+                            <span class="apt-code">${sClean}</span>
+                            <span class="route-arrow">➔</span>
+                            <span class="apt-code">${dClean}</span>
+                        </div>
+                    `;
+                }
+
+                // Direction in Transition
+                const dirTrans = r.direction_transition || '---';
+
+                // Customer Name
+                const custName = r.customer_name || 'Customer (Direct Cargo)';
+
+                // Pieces & Weight
+                const pkgDisp = r.package_display || (r.package_pieces ? `${r.package_pieces} pcs` : '---');
+                const grossWt = r.gross_weight || '---';
+                const volWt = r.volume_weight || '---';
+
+                // Latest Activity / Message
+                const msgText = r.latest_activity || r.status_detail || '---';
+
+                // Last Updated
+                const updatedDisp = r.last_updated_at ? r.last_updated_at.replace(' ', '<br><span style="color:#94a3b8;font-size:0.75rem;">') + '</span>' : '---';
+
+                tr.innerHTML = `
+                    <td style="text-align: center; color: #64748b; font-weight: 600; font-size: 0.82rem;">${idx + 1}</td>
+                    <td><strong style="color: #0f172a; font-size: 0.88rem;" title="${custName}">${custName}</strong></td>
+                    <td>
+                        <div class="cell-awb-wrap">
+                            <span class="awb-code">${r.awb_no}</span>
+                            <button class="btn-copy-mini" onclick="copyAwb('${r.awb_no}', this)" title="Copy AWB Number">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                    </td>
+                    <td><span class="pw-badge"><strong>${pkgDisp}</strong></span></td>
+                    <td style="white-space: nowrap; font-size: 0.84rem; font-weight: 600;">${grossWt}</td>
+                    <td style="white-space: nowrap; font-size: 0.82rem; color: #64748b;">${volWt}</td>
+                    <td>${carrierHtml}</td>
+                    <td>${flightHtml}</td>
+                    <td>${routeHtml}</td>
+                    <td style="font-size: 0.83rem; font-weight: 500; color: #1e293b;"><span class="msg-clamp" title="${dirTrans}">${dirTrans}</span></td>
+                    <td>${statusHtml}</td>
+                    <td class="msg-cell"><div class="msg-clamp" title="${msgText}">${msgText}</div></td>
+                    <td style="font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; white-space: nowrap;">${updatedDisp}</td>
+                    <td style="text-align: center;"><span style="background: #f1f5f9; padding: 2px 7px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: #475569;">${r.tracked_count || 1}x</span></td>
+                    <td style="text-align: center;">
+                        <button class="btn-inspect-premium" onclick="inspectShipment('${r.awb_no}')" title="Inspect Full Record">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Inspect</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function downloadMasterExcel() {
+            const searchVal = (document.getElementById('ledgerSearchInput')?.value || '').trim();
+            const statusVal = activeLedgerStatus || 'ALL';
+            window.location.href = `/api/v1/ledger/export/excel?search=${encodeURIComponent(searchVal)}&status=${encodeURIComponent(statusVal)}`;
+        }
+
+        function downloadMasterCsv() {
+            const searchVal = (document.getElementById('ledgerSearchInput')?.value || '').trim();
+            const statusVal = activeLedgerStatus || 'ALL';
+            window.location.href = `/api/v1/ledger/export/csv?search=${encodeURIComponent(searchVal)}&status=${encodeURIComponent(statusVal)}`;
+        }
+
 
         async function exportBulkExcel() {
             if (!currentBulkRecords || currentBulkRecords.length === 0) {
@@ -1882,6 +2289,11 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
 
         window.addEventListener('DOMContentLoaded', () => {
             trackAWB();
+            // Fetch initial master ledger count
+            fetch('/api/v1/ledger/stats').then(r => r.json()).then(data => {
+                const navBadge = document.getElementById('navLedgerBadge');
+                if (navBadge) navBadge.innerText = data.total_records ?? 0;
+            }).catch(() => {});
         });
     </script>
 </body>
