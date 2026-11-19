@@ -544,6 +544,23 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(res_health.status_code, 200)
         self.assertEqual(len(res_health.json()["carriers"]), 10)
 
+        # Verify Dashboard UI endpoint
+        res_ui = client.get("/")
+        self.assertEqual(res_ui.status_code, 200)
+        self.assertIn("btnModeBulk", res_ui.text)
+        self.assertIn("switchDashboardMode", res_ui.text)
+        self.assertIn("bulkTrackerSection", res_ui.text)
+
+        # Verify Bulk API with skipped carriers
+        res_bulk = client.post("/api/v1/track/bulk", json={
+            "text": "065-38891834\n615-63964714",
+            "workers": 2
+        })
+        self.assertEqual(res_bulk.status_code, 200)
+        data = res_bulk.json()
+        self.assertEqual(data["total_requested"], 2)
+        self.assertEqual(data["total_skipped"], 2)
+
     def test_unsupported_prefix_skipping(self):
         tracker = BulkCargoTracker(max_global_workers=2)
         # Test 065 (Saudia Cargo) and 615 (DHL Aviation)
