@@ -36,6 +36,7 @@
         .badge-ek { background: var(--primary-ek); color: #fef08a; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #dc2626; }
         .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
         .badge-ai { background: var(--primary-ai); color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .badge-tk { background: #e30613; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #991b1b; }
         .title { font-size: 1.35rem; font-weight: 800; color: #1e293b; margin-left: 6px; }
 
         /* Mode Switcher */
@@ -203,6 +204,7 @@
         .ct-emirates { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
         .ct-lufthansa { background: #eff6ff; color: #05164d; border-color: #bfdbfe; }
         .ct-airindia { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .ct-turkish { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
         .ct-other { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
 
         /* Status Badge */
@@ -278,6 +280,7 @@
                 <span class="badge-ek">EMIRATES (176)</span>
                 <span class="badge-lh">LUFTHANSA (020)</span>
                 <span class="badge-ai">AIR INDIA (098)</span>
+                <span class="badge-tk">TURKISH (235)</span>
                 <span class="title">Global Cargo Tracker</span>
             </div>
             <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Swagger API ↗</a>
@@ -296,7 +299,7 @@
                     📋 Master Cargo Sheet (Historical Ledger) <span id="navLedgerBadge" style="background:#0f172a;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.75rem;margin-left:6px;font-family:'JetBrains Mono',monospace;">0</span>
                 </button>
             </div>
-            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 10-Carrier Tracking & Anti-Bot Protection</div>
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 11-Carrier Tracking & Anti-Bot Protection</div>
         </div>
 
         <div class="error-msg" id="errorBox"></div>
@@ -317,12 +320,16 @@
                         <option value="emirates">Emirates SkyCargo (176)</option>
                         <option value="lufthansa">Lufthansa Cargo (020)</option>
                         <option value="airindia">Air India Cargo (098)</option>
+                        <option value="turkish">Turkish Cargo (235)</option>
                     </select>
-                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 077-59068973, 229-18148900, 020-03295493) or paste multiple AWBs to auto-track batch" value="077-59068973" />
+                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 235-35928502, 077-59068973, 229-18148900) or paste multiple AWBs to auto-track batch" value="235-35928502" />
                     <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
                 </div>
                 <div class="quick-links">
                     <span>Quick Samples:</span>
+                    <button class="quick-btn" onclick="setAwb('235-35928502', 'turkish')">235-35928502 (Turkish Cargo LHR)</button>
+                    <button class="quick-btn" onclick="setAwb('235-36000274', 'turkish')">235-36000274 (Turkish Cargo FRA)</button>
+                    <button class="quick-btn" onclick="setAwb('235-35928513', 'turkish')">235-35928513 (Turkish Cargo JFK)</button>
                     <button class="quick-btn" onclick="setAwb('077-59068973', 'cargoflash')">077-59068973 (EgyptAir LON)</button>
                     <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Delivered)</button>
                     <button class="quick-btn" onclick="setAwb('229-17349544', 'kuwait')">229-17349544 (Kuwait Departed)</button>
@@ -873,6 +880,9 @@
 
         function fillUserTestAwbs() {
             const userAwbs = [
+                "235-35928502",
+                "235-36000274",
+                "235-35928513",
                 "077-59068973",
                 "229-18148900",
                 "932-78969444",
@@ -887,7 +897,7 @@
             ];
             document.getElementById('bulkTextarea').value = userAwbs.join('\n');
             switchBulkTab('paste');
-            logTerminal(`Loaded 11 mixed test AWBs (includes supported carriers + Saudia 065 & DHL 615).`, 'info');
+            logTerminal(`Loaded 14 mixed test AWBs (includes Turkish Cargo 235, supported carriers, and Saudia 065 & DHL 615).`, 'info');
         }
 
         function fillBulkSample() {
@@ -1081,6 +1091,7 @@
                 '176': 'Emirates SkyCargo',
                 '020': 'Lufthansa Cargo',
                 '098': 'Air India Cargo',
+                '235': 'Turkish Cargo',
                 '065': 'Saudia Cargo',
                 '615': 'DHL Aviation'
             };
@@ -1162,6 +1173,7 @@
                 else if (r.carrier_prefix === '176') ctClass = 'ct-emirates';
                 else if (r.carrier_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.carrier_prefix === '098') ctClass = 'ct-airindia';
+                else if (r.carrier_prefix === '235') ctClass = 'ct-turkish';
 
                 const shortName = getShortCarrierName(r.carrier_name, r.carrier_prefix);
                 const carrierHtml = `
@@ -1424,6 +1436,7 @@
                 else if (r.iata_prefix === '176') ctClass = 'ct-emirates';
                 else if (r.iata_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.iata_prefix === '098') ctClass = 'ct-airindia';
+                else if (r.iata_prefix === '235') ctClass = 'ct-turkish';
 
                 const shortName = getShortCarrierName(r.carrier_name, r.iata_prefix);
                 const carrierHtml = `
@@ -2212,6 +2225,55 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                                 <td>${h.station || '---'}</td>
                                 <td>${pcsWt}</td>
                                 <td>${stateBadge}</td>
+                            </tr>
+                        `;
+                    });
+
+                } else if (cName.includes('Turkish') || cName.includes('235')) {
+                    // Turkish Cargo (TK)
+                    topBar.style.background = '#fff1f2';
+                    document.getElementById('statusPill').style.background = '#e30613';
+                    document.getElementById('statusPill').style.color = '#ffffff';
+                    document.getElementById('statusPill').innerText = data.overview.status || 'IN_TRANSIT';
+
+                    const act = data.overview.latest_activity ? ` &bull; <em>${data.overview.latest_activity}</em>` : '';
+                    const csg = data.overview.consignee_issued_to ? ` &bull; Consignee: <strong>${data.overview.consignee_issued_to}</strong>` : '';
+                    document.getElementById('latestBanner').innerHTML = `<strong>Turkish Cargo (TK):</strong> ${data.overview.status}${act}${csg}`;
+
+                    document.getElementById('routeDisplay').innerText = data.overview.route || `${data.overview.origin} ➔ ${data.overview.destination}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.total_pieces || '---'} pcs / ${data.overview.gross_weight || '---'}`;
+                    document.getElementById('volumeDisplay').innerText = data.overview.volume || '---';
+                    document.getElementById('productDisplay').innerText = data.overview.consignee_issued_to || 'General Air Cargo';
+
+                    // Cargo Reservation Flights Tab
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flight_legs || []).forEach(fl => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color: #e30613;">${fl.flight_no}</strong></td>
+                                <td>${fl.segment || 'DEL-IST'}</td>
+                                <td>${fl.etd || fl.flight_date || 'N/A'}</td>
+                                <td>${fl.eta || 'N/A'}</td>
+                                <td>${fl.pieces || '---'} pcs / ${fl.weight || '---'}${fl.volume ? ' (' + fl.volume + ' CBM)' : ''}</td>
+                                <td><span class="badge-ev">${fl.approval_status || 'Approved'}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Milestones Tab
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.milestones || []).forEach((m, idx) => {
+                        const badge = idx === data.milestones.length - 1 ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Completed</span>';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${m.date || 'N/A'}</td>
+                                <td><span class="badge-ev">${m.status}</span></td>
+                                <td>${m.details || m.status}</td>
+                                <td><strong>${m.station || '---'}</strong></td>
+                                <td>---</td>
+                                <td>${badge}</td>
                             </tr>
                         `;
                     });

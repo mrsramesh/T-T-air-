@@ -22,6 +22,7 @@ from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from cargoflash_tracker.client import CargoFlashClient, CargoFlashShipmentNotFoundError
 from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError
 from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError
+from turkish_tracker.client import TurkishCargoClient, TurkishShipmentNotFoundError
 import io
 import openpyxl
 from bulk_tracker import (
@@ -48,6 +49,7 @@ class TestCargoTrackers(unittest.TestCase):
         self.cargoflash_client = CargoFlashClient()
         self.neos_client = NeosCargoClient()
         self.indigo_client = IndigoCargoClient()
+        self.turkish_client = TurkishCargoClient()
 
     def test_airindia_awb_normalization(self):
         self.assertEqual(self.ai_client.normalize_awb("098-30244056"), "09830244056")
@@ -374,6 +376,51 @@ class TestCargoTrackers(unittest.TestCase):
             self.indigo_client.track("312-99999999")
         self.assertIn("Could not find shipment for AWB 312-99999999", str(ctx.exception))
 
+    def test_turkish_awb_normalization(self):
+        prefix, serial, formatted, full_digits = self.turkish_client.normalize_awb("235-3592-8502")
+        self.assertEqual(prefix, "235")
+        self.assertEqual(serial, "35928502")
+        self.assertEqual(formatted, "235-35928502")
+        self.assertEqual(full_digits, "23535928502")
+
+        # 8-digit serial input
+        prefix, serial, formatted, full_digits = self.turkish_client.normalize_awb("35928502")
+        self.assertEqual(prefix, "235")
+        self.assertEqual(serial, "35928502")
+        self.assertEqual(formatted, "235-35928502")
+
+    def test_live_turkish_tracking_del_lhr(self):
+        res = self.turkish_client.track("235-3592-8502")
+        self.assertEqual(res.overview.formatted_awb, "235-35928502")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "LHR")
+        self.assertEqual(res.overview.total_pieces, 17)
+        self.assertEqual(res.overview.gross_weight, "470.0 kg")
+        self.assertEqual(res.overview.volume, "5.14 CBM")
+        self.assertEqual(len(res.flight_legs), 3)
+        self.assertEqual(res.flight_legs[0].flight_no, "TK0717")
+        self.assertEqual(res.flight_legs[0].segment, "DEL-IST")
+        self.assertEqual(res.flight_legs[0].pieces, 17)
+        self.assertEqual(res.flight_legs[0].weight, "470 kg")
+        self.assertEqual(res.flight_legs[0].volume, "5.14")
+        self.assertEqual(res.flight_legs[1].flight_no, "TK1931")
+        self.assertEqual(res.flight_legs[1].segment, "IST-LHR")
+        self.assertEqual(res.flight_legs[2].flight_no, "TK1985")
+        self.assertEqual(res.flight_legs[2].segment, "IST-LHR")
+
+    def test_turkish_bulk_tracking_and_normalization(self):
+        tracker = BulkCargoTracker(max_global_workers=1)
+        rec = tracker.track_single("235-35928502")
+        self.assertEqual(rec.carrier_prefix, "235")
+        self.assertEqual(rec.carrier_name, "Turkish Cargo (TK)")
+        self.assertEqual(rec.carrier_code, "TK")
+        self.assertEqual(rec.origin, "DEL")
+        self.assertEqual(rec.destination, "LHR")
+        self.assertEqual(rec.pieces, 17)
+        self.assertEqual(rec.weight, "470.0 kg")
+        self.assertEqual(rec.status, "IN_TRANSIT")
+        self.assertIn("TK0717", rec.flight_details)
+
     def test_awb_extractor_various_formats(self):
         text = """
         Tracking List:
@@ -651,6 +698,14 @@ class TestCargoTrackers(unittest.TestCase):
         res_csv = client.get("/api/v1/ledger/export/csv")
         self.assertEqual(res_csv.status_code, 200)
         self.assertIn("text/csv", res_csv.headers["content-type"])
+
+        # Verify Turkish Cargo tracking endpoint
+        res_tk = client.get("/api/v1/track/235-35928502")
+        self.assertEqual(res_tk.status_code, 200)
+        tk_data = res_tk.json()
+        self.assertEqual(tk_data["carrier_code"], "235")
+        self.assertEqual(tk_data["data"]["overview"]["origin"], "DEL")
+        self.assertEqual(tk_data["data"]["overview"]["destination"], "LHR")
 
     def test_unreachable_portal_flagging(self):
         tracker = BulkCargoTracker(max_global_workers=1)

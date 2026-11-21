@@ -347,6 +347,34 @@ class CarrierDataNormalizer:
         )
 
     @classmethod
+    def normalize_turkish(cls, res: Any, raw_input: str, elapsed_sec: float) -> UnifiedTrackingRecord:
+        ov = res.overview
+        status_category = cls._classify_status(ov.status)
+        fl_str = ", ".join(dict.fromkeys(f.flight_no for f in res.flight_legs if getattr(f, "flight_no", None))) if res.flight_legs else None
+        raw_dict = res.model_dump() if hasattr(res, "model_dump") else res.dict()
+        return UnifiedTrackingRecord(
+            awb=ov.formatted_awb,
+            raw_input=raw_input,
+            carrier_prefix="235",
+            carrier_name="Turkish Cargo (TK)",
+            carrier_code="TK",
+            status=status_category,
+            status_detail=ov.latest_activity or ov.status,
+            origin=ov.origin,
+            destination=ov.destination,
+            route=ov.route,
+            pieces=ov.total_pieces,
+            weight=ov.gross_weight,
+            volume=ov.volume,
+            flight_details=fl_str,
+            latest_activity=ov.latest_activity,
+            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            consignee_issued_to=ov.consignee_issued_to,
+            execution_time_sec=round(elapsed_sec, 3),
+            raw_data=raw_dict,
+        )
+
+    @classmethod
     def create_error_record(
         cls,
         awb_input: str,

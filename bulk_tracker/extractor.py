@@ -22,6 +22,7 @@ CARRIER_PREFIXES = {
     "176": ("Emirates SkyCargo", "EK"),
     "020": ("Lufthansa Cargo", "LH"),
     "098": ("Air India Cargo", "AI"),
+    "235": ("Turkish Cargo (TK)", "TK"),
 }
 
 # Extended registry of global IATA airline prefixes for recognition and polite skipping
@@ -37,7 +38,6 @@ KNOWN_GLOBAL_IATA_PREFIXES = {
     "074": ("KLM Cargo", "KL"),
     "160": ("Cathay Pacific Cargo", "CX"),
     "217": ("Thai Airways Cargo", "TG"),
-    "235": ("Turkish Airlines Cargo", "TK"),
     "180": ("Korean Air Cargo", "KE"),
     "618": ("Singapore Airlines Cargo", "SQ"),
     "081": ("Qantas Freight", "QF"),
