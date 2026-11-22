@@ -243,16 +243,24 @@ class MasterLedgerManager:
         self,
         search: Optional[str] = None,
         status: Optional[str] = None,
+        lifecycle: Optional[str] = None,
         limit: int = 1000,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """Retrieves master records with optional search filter and status filtering."""
+        """Retrieves master records with optional search filter, status filtering, and lifecycle filtering."""
         query = "SELECT * FROM master_awb_ledger WHERE 1=1"
         params: List[Any] = []
 
         if status and status.upper() != "ALL":
             query += " AND status = ?"
             params.append(status.upper())
+
+        if lifecycle:
+            lc = lifecycle.strip().lower()
+            if lc in ("active", "on_the_way", "ontheway"):
+                query += " AND status != 'DELIVERED'"
+            elif lc in ("delivered", "archive", "completed"):
+                query += " AND status = 'DELIVERED'"
 
         if search and search.strip():
             s = f"%{search.strip().lower()}%"
@@ -275,11 +283,20 @@ class MasterLedgerManager:
             cur = conn.execute(query, params)
             return [dict(r) for r in cur.fetchall()]
 
+    def get_active_shipments(self, limit: int = 5000) -> List[Dict[str, Any]]:
+        """Returns shipments currently on the way (status != DELIVERED)."""
+        return self.get_all_records(lifecycle="active", limit=limit)
+
+    def get_delivered_shipments(self, limit: int = 5000) -> List[Dict[str, Any]]:
+        """Returns shipments marked DELIVERED (completed archive)."""
+        return self.get_all_records(lifecycle="delivered", limit=limit)
+
     def get_summary_stats(self) -> Dict[str, Any]:
         """Calculates live summary metrics for the Master Sheet dashboard."""
         with self._get_connection() as conn:
             total = conn.execute("SELECT COUNT(*) FROM master_awb_ledger;").fetchone()[0]
             delivered = conn.execute("SELECT COUNT(*) FROM master_awb_ledger WHERE status = 'DELIVERED';").fetchone()[0]
+            active_on_way = conn.execute("SELECT COUNT(*) FROM master_awb_ledger WHERE status != 'DELIVERED';").fetchone()[0]
             transit = conn.execute("SELECT COUNT(*) FROM master_awb_ledger WHERE status IN ('IN_TRANSIT', 'DEPARTED');").fetchone()[0]
             arrived = conn.execute("SELECT COUNT(*) FROM master_awb_ledger WHERE status = 'ARRIVED';").fetchone()[0]
             not_found = conn.execute("SELECT COUNT(*) FROM master_awb_ledger WHERE status = 'NOT_FOUND';").fetchone()[0]
@@ -291,6 +308,7 @@ class MasterLedgerManager:
             return {
                 "total_records": total,
                 "delivered": delivered,
+                "active_on_the_way": active_on_way,
                 "in_transit": transit,
                 "arrived": arrived,
                 "not_found": not_found,
@@ -303,21 +321,16 @@ class MasterLedgerManager:
     def export_excel(self, records: Optional[List[Dict[str, Any]]] = None) -> bytes:
         """
         Generates an executive-grade, styled Master Air Cargo Excel Sheet (.xlsx).
-        Headers requested by user:
-        Customer Name, AWB No, Package, Gross Weight, Volume Weight, IATA, Flight Code, Source, Destination, Direction in Transition, Status of AWB
-        Plus tracking audit timestamps.
+        Contains tabs:
+        1. All Shipments (Complete Ledger)
+        2. 🚚 On The Way (Active Shipments)
+        3. ✅ Delivered (Completed Archive)
+        4. Executive Summary & KPIs
         """
         if records is None:
             records = self.get_all_records(limit=10000)
 
         wb = openpyxl.Workbook()
-
-        # ====================================================
-        # Sheet 1: Master Air Cargo Ledger
-        # ====================================================
-        ws = wb.active
-        ws.title = "Master Air Cargo Ledger"
-        ws.views.sheetView[0].showGridLines = True
 
         headers = [
             "#",
@@ -338,8 +351,6 @@ class MasterLedgerManager:
             "Times Tracked",
         ]
 
-        ws.append(headers)
-
         header_font = Font(name="Calibri", size=11, bold=True, color=self.WHITE)
         header_fill = PatternFill(start_color=self.NAVY_HEADER, end_color=self.NAVY_HEADER, fill_type="solid")
         header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -347,84 +358,96 @@ class MasterLedgerManager:
         thin_side = Side(border_style="thin", color=self.BORDER_COLOR)
         cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
 
-        for col_num in range(1, len(headers) + 1):
-            cell = ws.cell(row=1, column=col_num)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_align
-            cell.border = cell_border
-        ws.row_dimensions[1].height = 28
-
         regular_font = Font(name="Calibri", size=10, color="0F172A")
         mono_font = Font(name="Consolas", size=10, bold=True, color="0F172A")
         zebra_fill = PatternFill(start_color=self.ZEBRA_FILL, end_color=self.ZEBRA_FILL, fill_type="solid")
 
-        for idx, row in enumerate(records, start=1):
-            st = str(row.get("status") or "").upper()
-            row_data = [
-                idx,
-                row.get("customer_name") or "Customer (Direct Cargo)",
-                row.get("awb_no") or "---",
-                row.get("package_display") or (f"{row.get('package_pieces')} pcs" if row.get("package_pieces") else "---"),
-                row.get("gross_weight") or "---",
-                row.get("volume_weight") or "---",
-                row.get("iata") or f"{row.get('iata_prefix')} ({row.get('carrier_name')})",
-                row.get("flight_code") or "---",
-                row.get("source") or "---",
-                row.get("destination") or "---",
-                row.get("direction_transition") or "---",
-                st,
-                row.get("latest_activity") or row.get("status_detail") or "---",
-                row.get("first_tracked_at") or "---",
-                row.get("last_updated_at") or "---",
-                row.get("tracked_count") or 1,
-            ]
-            ws.append(row_data)
-            row_num = ws.max_row
-            ws.row_dimensions[row_num].height = 22
+        def _populate_tab(ws, tab_records):
+            ws.views.sheetView[0].showGridLines = True
+            ws.append(headers)
 
-            is_even = (idx % 2 == 0)
+            for col_num in range(1, len(headers) + 1):
+                cell = ws.cell(row=1, column=col_num)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_align
+                cell.border = cell_border
+            ws.row_dimensions[1].height = 28
 
-            for col_idx in range(1, len(row_data) + 1):
-                c = ws.cell(row=row_num, column=col_idx)
-                c.border = cell_border
-                c.font = regular_font
+            for idx, row in enumerate(tab_records, start=1):
+                st = str(row.get("status") or "").upper()
+                row_data = [
+                    idx,
+                    row.get("customer_name") or "Customer (Direct Cargo)",
+                    row.get("awb_no") or "---",
+                    row.get("package_display") or (f"{row.get('package_pieces')} pcs" if row.get("package_pieces") else "---"),
+                    row.get("gross_weight") or "---",
+                    row.get("volume_weight") or "---",
+                    row.get("iata") or f"{row.get('iata_prefix')} ({row.get('carrier_name')})",
+                    row.get("flight_code") or "---",
+                    row.get("source") or "---",
+                    row.get("destination") or "---",
+                    row.get("direction_transition") or "---",
+                    st,
+                    row.get("latest_activity") or row.get("status_detail") or "---",
+                    row.get("first_tracked_at") or "---",
+                    row.get("last_updated_at") or "---",
+                    row.get("tracked_count") or 1,
+                ]
+                ws.append(row_data)
+                row_num = ws.max_row
+                ws.row_dimensions[row_num].height = 22
 
-                if is_even:
-                    c.fill = zebra_fill
+                is_even = (idx % 2 == 0)
 
-                # AWB column monospace
-                if col_idx == 3:
-                    c.font = mono_font
-                    c.alignment = Alignment(horizontal="center", vertical="center")
-                elif col_idx in (1, 9, 10, 16):
-                    c.alignment = Alignment(horizontal="center", vertical="center")
-                else:
-                    c.alignment = Alignment(horizontal="left", vertical="center")
+                for col_idx in range(1, len(row_data) + 1):
+                    c = ws.cell(row=row_num, column=col_idx)
+                    c.border = cell_border
+                    c.font = regular_font
 
-                # Status pill coloring in Excel
-                if col_idx == 12 and st in self.STATUS_COLORS:
-                    bg_color, fg_color = self.STATUS_COLORS[st]
-                    c.fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
-                    c.font = Font(name="Calibri", size=10, bold=True, color=fg_color)
-                    c.alignment = Alignment(horizontal="center", vertical="center")
+                    if is_even:
+                        c.fill = zebra_fill
 
-        # Auto-adjust column widths
-        for col in ws.columns:
-            max_len = 0
-            col_letter = get_column_letter(col[0].column)
-            for cell in col:
-                val = str(cell.value or "")
-                if len(val) > max_len:
-                    max_len = len(val)
-            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 38)
+                    if col_idx == 3:
+                        c.font = mono_font
+                        c.alignment = Alignment(horizontal="center", vertical="center")
+                    elif col_idx in (1, 9, 10, 16):
+                        c.alignment = Alignment(horizontal="center", vertical="center")
+                    else:
+                        c.alignment = Alignment(horizontal="left", vertical="center")
 
-        # Freeze top header row
-        ws.freeze_panes = "A2"
+                    if col_idx == 12 and st in self.STATUS_COLORS:
+                        bg_color, fg_color = self.STATUS_COLORS[st]
+                        c.fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+                        c.font = Font(name="Calibri", size=10, bold=True, color=fg_color)
+                        c.alignment = Alignment(horizontal="center", vertical="center")
 
-        # ====================================================
-        # Sheet 2: Executive Summary & Ledger Statistics
-        # ====================================================
+            for col in ws.columns:
+                max_len = 0
+                col_letter = get_column_letter(col[0].column)
+                for cell in col:
+                    val = str(cell.value or "")
+                    if len(val) > max_len:
+                        max_len = len(val)
+                ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 38)
+            ws.freeze_panes = "A2"
+
+        # Tab 1: All Shipments
+        ws_all = wb.active
+        ws_all.title = "All Shipments"
+        _populate_tab(ws_all, records)
+
+        # Tab 2: On The Way (Active)
+        active_recs = [r for r in records if (r.get("status") or "").upper() != "DELIVERED"]
+        ws_active = wb.create_sheet(title="On The Way (Active)")
+        _populate_tab(ws_active, active_recs)
+
+        # Tab 3: Delivered Archive
+        delivered_recs = [r for r in records if (r.get("status") or "").upper() == "DELIVERED"]
+        ws_dlv = wb.create_sheet(title="Delivered Archive")
+        _populate_tab(ws_dlv, delivered_recs)
+
+        # Tab 4: Executive Summary
         ws_sum = wb.create_sheet(title="Executive Summary")
         ws_sum.views.sheetView[0].showGridLines = True
 

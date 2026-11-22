@@ -12,6 +12,7 @@ TURKISH_CARGO_BASE_URL = "https://www.turkishcargo.com"
 TURKISH_CARGO_TRACKING_URL = "https://www.turkishcargo.com/en/cargo-tracking"
 TURKISH_CARGO_DIRECT_URL = "https://www.turkishcargo.com/en/cargo-tracking?awbPrefix={prefix}&awbNumber={serial}"
 PARCELSAPP_DIRECT_URL = "https://parcelsapp.com/en/tracking/{prefix}-{serial}"
+TRACK_TRACE_CARGO_URL = "https://www.track-trace.com/aircargo"
 
 # Enterprise Proxy Configuration (Supports HTTP, HTTPS, SOCKS5, and Rotating Residential Proxies)
 DEFAULT_PROXY = os.environ.get("TURKISH_CARGO_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
@@ -23,7 +24,7 @@ DEFAULT_HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.turkishcargo.com/en/cargo-tracking",
+    "Referer": "https://www.track-trace.com/aircargo",
 }
 
 STEALTH_SCRIPT = """
@@ -32,5 +33,19 @@ STEALTH_SCRIPT = """
     window.chrome = { runtime: {} };
     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
     Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    
+    // Mask WebGL vendor and renderer to look like genuine hardware
+    const getParam1 = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(p) {
+        if (p === 37445) return 'Intel Inc.';
+        if (p === 37446) return 'Intel(R) Iris(TM) Plus Graphics 655';
+        return getParam1.apply(this, arguments);
+    };
+    const getParam2 = WebGL2RenderingContext.prototype.getParameter;
+    WebGL2RenderingContext.prototype.getParameter = function(p) {
+        if (p === 37445) return 'Intel Inc.';
+        if (p === 37446) return 'Intel(R) Iris(TM) Plus Graphics 655';
+        return getParam2.apply(this, arguments);
+    };
 })();
 """

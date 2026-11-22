@@ -32,6 +32,8 @@ class CarrierDataNormalizer:
             return "ACCEPTED"
         if any(w in s for w in ("booked", "bkd", "exe", "confirmed", "bk")):
             return "BOOKED"
+        if any(w in s for w in ("unreachable", "unreach", "protected", "blocked", "challenge")):
+            return "UNREACHABLE"
         if any(w in s for w in ("not found", "details not available", "no result", "does not exist")):
             return "NOT_FOUND"
         return "IN_TRANSIT" if s else "UNKNOWN"
@@ -56,7 +58,7 @@ class CarrierDataNormalizer:
             weight=ov.gross_weight,
             flight_details=ov.flight_no,
             latest_activity=ov.latest_activity,
-            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            latest_location=ov.destination if status_category == "DELIVERED" else (ov.origin if status_category != "UNREACHABLE" else "Carrier Direct Link Available"),
             consignee_issued_to=ov.issued_to,
             execution_time_sec=round(elapsed_sec, 3),
             raw_data=raw_dict,
@@ -84,7 +86,7 @@ class CarrierDataNormalizer:
             weight=ov.gross_weight,
             flight_details=fl_str,
             latest_activity=lat_act,
-            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            latest_location=ov.destination if status_category == "DELIVERED" else (ov.origin if status_category != "UNREACHABLE" else "Carrier Direct Link Available"),
             consignee_issued_to=None,
             execution_time_sec=round(elapsed_sec, 3),
             raw_data=raw_dict,
@@ -152,7 +154,7 @@ class CarrierDataNormalizer:
             volume=f"{ov.volume} {ov.volume_unit}" if ov.volume else None,
             flight_details=fl_str,
             latest_activity=lat_act,
-            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            latest_location=ov.destination if status_category == "DELIVERED" else (ov.origin if status_category != "UNREACHABLE" else "Carrier Direct Link Available"),
             consignee_issued_to=None,
             execution_time_sec=round(elapsed_sec, 3),
             raw_data=raw_dict,
@@ -251,7 +253,7 @@ class CarrierDataNormalizer:
             volume=f"{ov.volume} {ov.volume_unit}" if ov.volume else None,
             flight_details=fl_str,
             latest_activity=lat_act,
-            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            latest_location=ov.destination if status_category == "DELIVERED" else (ov.origin if status_category != "UNREACHABLE" else "Carrier Direct Link Available"),
             consignee_issued_to=None,
             execution_time_sec=round(elapsed_sec, 3),
             raw_data=raw_dict,
@@ -368,7 +370,7 @@ class CarrierDataNormalizer:
             volume=ov.volume,
             flight_details=fl_str,
             latest_activity=ov.latest_activity,
-            latest_location=ov.destination if status_category == "DELIVERED" else ov.origin,
+            latest_location=ov.destination if status_category == "DELIVERED" else (ov.origin if status_category != "UNREACHABLE" else "Carrier Direct Link Available"),
             consignee_issued_to=ov.consignee_issued_to,
             execution_time_sec=round(elapsed_sec, 3),
             raw_data=raw_dict,

@@ -44,6 +44,7 @@ class TurkishOverview(BaseModel):
 
 class TurkishTrackingResult(BaseModel):
     airline: str = Field("Turkish Cargo (TK)", description="Carrier Name")
+    formatted_awb: str = Field(..., description="Standard formatted AWB e.g. 235-XXXXXXXX")
     overview: TurkishOverview
     flight_legs: List[TurkishFlightLeg] = Field(default_factory=list, description="Cargo reservation flight legs")
     milestones: List[TurkishMilestone] = Field(default_factory=list, description="Operational milestone events")

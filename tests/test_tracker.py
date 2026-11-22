@@ -389,6 +389,12 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(serial, "35928502")
         self.assertEqual(formatted, "235-35928502")
 
+        # AWB with whitespace as user typed: "235-5339 9835"
+        prefix, serial, formatted, full_digits = self.turkish_client.normalize_awb("235-5339 9835")
+        self.assertEqual(prefix, "235")
+        self.assertEqual(serial, "53399835")
+        self.assertEqual(formatted, "235-53399835")
+
     def test_live_turkish_tracking_del_lhr(self):
         res = self.turkish_client.track("235-3592-8502")
         self.assertEqual(res.overview.formatted_awb, "235-35928502")
@@ -408,6 +414,35 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(res.flight_legs[2].flight_no, "TK1985")
         self.assertEqual(res.flight_legs[2].segment, "IST-LHR")
 
+    def test_live_turkish_tracking_awb_35928513_delivered(self):
+        res = self.turkish_client.track("235-35928513")
+        self.assertEqual(res.overview.formatted_awb, "235-35928513")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "LHR")
+        self.assertEqual(res.overview.total_pieces, 20)
+        self.assertEqual(res.overview.gross_weight, "536.00 kg")
+        self.assertEqual(res.overview.volume, "5.91 CBM")
+        self.assertEqual(res.overview.status, "DELIVERED")
+        self.assertEqual(len(res.flight_legs), 2)
+        self.assertEqual(res.flight_legs[0].flight_no, "TK0717")
+        self.assertEqual(res.flight_legs[1].flight_no, "TK1979")
+
+    def test_live_turkish_tracking_awb_36000274_delivered(self):
+        res = self.turkish_client.track("235-36000274")
+        self.assertEqual(res.overview.formatted_awb, "235-36000274")
+        self.assertEqual(res.overview.origin, "DEL")
+        self.assertEqual(res.overview.destination, "EZE")
+        self.assertEqual(res.overview.total_pieces, 1)
+        self.assertEqual(res.overview.gross_weight, "3.00 kg")
+        self.assertEqual(res.overview.volume, "0.08 CBM")
+        self.assertEqual(res.overview.status, "DELIVERED")
+        self.assertEqual(len(res.flight_legs), 2)
+        self.assertEqual(res.flight_legs[0].flight_no, "TK0717")
+        self.assertEqual(res.flight_legs[0].segment, "DEL-IST")
+        self.assertEqual(res.flight_legs[1].flight_no, "TK0015")
+        self.assertEqual(res.flight_legs[1].segment, "IST-EZE")
+        self.assertEqual(len(res.milestones), 6)
+
     def test_turkish_bulk_tracking_and_normalization(self):
         tracker = BulkCargoTracker(max_global_workers=1)
         rec = tracker.track_single("235-35928502")
@@ -420,6 +455,23 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(rec.weight, "470.0 kg")
         self.assertEqual(rec.status, "IN_TRANSIT")
         self.assertIn("TK0717", rec.flight_details)
+
+    def test_turkish_unreachable_handling_no_fake_data(self):
+        # When an AWB hits PerimeterX / network restriction, it must return UNREACHABLE without fake numbers
+        res = self.turkish_client.track("235-5339 9835")
+        self.assertEqual(res.overview.formatted_awb, "235-53399835")
+        self.assertEqual(res.overview.status, "UNREACHABLE")
+        self.assertIsNone(res.overview.total_pieces)
+        self.assertEqual(res.overview.gross_weight, "---")
+        self.assertIn("track_trace_url", res.raw_data)
+        self.assertIn("turkish_cargo_url", res.raw_data)
+
+        # Normalization check
+        tracker = BulkCargoTracker(max_global_workers=1)
+        rec = tracker.track_single("235-5339 9835")
+        self.assertEqual(rec.status, "UNREACHABLE")
+        self.assertIsNone(rec.pieces)
+        self.assertEqual(rec.weight, "---")
 
     def test_awb_extractor_various_formats(self):
         text = """
@@ -707,6 +759,13 @@ class TestCargoTrackers(unittest.TestCase):
         self.assertEqual(tk_data["data"]["overview"]["origin"], "DEL")
         self.assertEqual(tk_data["data"]["overview"]["destination"], "LHR")
 
+        # Verify Turkish Cargo protected/unreachable endpoint returns 200 with UNREACHABLE and links
+        res_tk_unreach = client.get("/api/v1/track/235-5339%209835")
+        self.assertEqual(res_tk_unreach.status_code, 200)
+        unreach_data = res_tk_unreach.json()
+        self.assertEqual(unreach_data["carrier_code"], "235")
+        self.assertEqual(unreach_data["data"]["overview"]["status"], "UNREACHABLE")
+
     def test_unreachable_portal_flagging(self):
         tracker = BulkCargoTracker(max_global_workers=1)
         err_rec = CarrierDataNormalizer.create_error_record(
@@ -718,6 +777,89 @@ class TestCargoTrackers(unittest.TestCase):
         )
         self.assertEqual(err_rec.status, "UNREACHABLE")
         self.assertIn("timed out", err_rec.error_message.lower())
+
+    def test_google_sheets_inspect_and_preview(self):
+        from bulk_tracker.google_sheets import GoogleSheetsTracker
+        tracker = GoogleSheetsTracker()
+        url = "https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing"
+        res = tracker.inspect_sheet(url, sheet_name="NOV-26", target_col="H")
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["awb_column"], "H")
+        self.assertGreaterEqual(res["valid_awbs_found"], 50)
+        self.assertIn("preview_records", res)
+        # Verify H19-H24 values exist in preview or manifest
+        manifest = tracker.extract_awb_manifest(url, sheet_name="NOV-26", target_col="H")
+        cells = {m["cell"]: m["raw_awb"] for m in manifest}
+        self.assertEqual(cells.get("H19"), "020-03497616")
+        self.assertEqual(cells.get("H20"), "775-80261893")
+        self.assertEqual(cells.get("H21"), "098-32343371")
+
+    def test_google_sheets_api_endpoints(self):
+        from fastapi.testclient import TestClient
+        import server
+        client = TestClient(server.app)
+
+        # Inspect working sheet
+        inspect_payload = {
+            "url": "https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing",
+            "sheet_name": "NOV-26",
+            "target_col": "H"
+        }
+        res = client.post("/api/v1/sheets/inspect", json=inspect_payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["awb_column"], "H")
+
+        # Test lifecycle endpoint
+        res_lc = client.get("/api/v1/sheets/lifecycle?view=all")
+        self.assertEqual(res_lc.status_code, 200)
+        lc_data = res_lc.json()
+        self.assertIn("records", lc_data)
+        self.assertIn("stats", lc_data)
+
+        # Test restricted sheet error handling (HTTP 401)
+        res_restricted = client.post("/api/v1/sheets/inspect", json={"url": "https://docs.google.com/spreadsheets/d/1OsdRGPcS2fLa8pI6C8rTh8eOYQMRRzhTVM2pOaN4h9U/edit?usp=sharing"})
+        self.assertEqual(res_restricted.status_code, 401)
+        self.assertIn("restricted", res_restricted.json()["detail"].lower())
+
+    def test_google_sheets_start_row_h110(self):
+        from bulk_tracker.google_sheets import GoogleSheetsTracker
+        tracker = GoogleSheetsTracker()
+        url = "https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing"
+        res = tracker.inspect_sheet(url, sheet_name="NOV-26", target_col="H", start_row=110)
+        self.assertEqual(res["status"], "success")
+        self.assertGreaterEqual(res["valid_awbs_found"], 10)
+        self.assertEqual(res["start_row"], 110)
+        # All rows should be >= 110
+        for rec in res["preview_records"]:
+            self.assertGreaterEqual(rec["row"], 110)
+
+    def test_autopilot_endpoints(self):
+        from fastapi.testclient import TestClient
+        import server
+        client = TestClient(server.app)
+
+        # Check status (initially stopped)
+        res = client.get("/api/v1/sheets/autopilot/status")
+        self.assertEqual(res.status_code, 200)
+
+        # Start autopilot
+        res_start = client.post("/api/v1/sheets/autopilot/start", json={
+            "sheet_name": "NOV-26",
+            "start_row": 110,
+            "interval_minutes": 60
+        })
+        self.assertEqual(res_start.status_code, 200)
+        st = client.get("/api/v1/sheets/autopilot/status").json()
+        self.assertTrue(st["is_running"])
+        self.assertEqual(st["config"]["start_row"], 110)
+
+        # Stop autopilot
+        res_stop = client.post("/api/v1/sheets/autopilot/stop")
+        self.assertEqual(res_stop.status_code, 200)
+        st2 = client.get("/api/v1/sheets/autopilot/status").json()
+        self.assertFalse(st2["is_running"])
 
 
 if __name__ == "__main__":

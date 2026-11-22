@@ -41,6 +41,15 @@ from bulk_tracker import (
     MasterLedgerManager,
     master_ledger,
 )
+from bulk_tracker.google_sheets import (
+    GoogleSheetsTracker,
+    GoogleSheetAccessError,
+    GoogleSheetError,
+)
+from bulk_tracker.autopilot import AutoPilotManager
+
+sheets_tracker = GoogleSheetsTracker()
+autopilot = AutoPilotManager(sheets_tracker, master_ledger)
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
@@ -371,6 +380,152 @@ def export_ledger_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=AirCargo_Master_Ledger_{datetime.now().strftime('%Y%m%d')}.csv"},
     )
+
+
+# =========================================================================
+# Google Sheets Auto-Sync & Lifecycle Tracking Endpoints
+# =========================================================================
+
+class GoogleSheetInspectRequest(BaseModel):
+    url: str
+    sheet_name: Optional[str] = None
+    target_col: Optional[str] = "H"
+    start_row: Optional[int] = None
+    scan_all_tabs: Optional[bool] = False
+
+
+class GoogleSheetSyncRequest(BaseModel):
+    url: str
+    sheet_name: Optional[str] = None
+    target_col: Optional[str] = "H"
+    start_row: Optional[int] = None
+    scan_all_tabs: Optional[bool] = False
+    workers: Optional[int] = 5
+    recheck_delivered: Optional[bool] = False
+
+
+class AutoPilotConfigRequest(BaseModel):
+    url: Optional[str] = None
+    sheet_name: Optional[str] = None
+    target_col: Optional[str] = "H"
+    start_row: Optional[int] = 110
+    scan_all_tabs: Optional[bool] = False
+    interval_minutes: Optional[int] = 30
+    workers: Optional[int] = 5
+
+
+@app.post("/api/v1/sheets/inspect", tags=["Google Sheets"])
+def inspect_google_sheet(payload: GoogleSheetInspectRequest):
+    """
+    Inspect a Google Sheet by URL:
+    - Lists all available sheet tabs.
+    - Auto-detects columns (Column H = AWB, Column C = Customer, Column F = Dest, etc.).
+    - Supports start_row (e.g. H110 downwards) and multi-tab scanning.
+    - Returns preview of found AWBs with row and cell coordinates.
+    """
+    try:
+        return sheets_tracker.inspect_sheet(
+            payload.url,
+            sheet_name=payload.sheet_name,
+            target_col=payload.target_col or "H",
+            start_row=payload.start_row,
+            scan_all_tabs=bool(payload.scan_all_tabs),
+        )
+    except GoogleSheetAccessError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/sheets/sync", tags=["Google Sheets"])
+def sync_and_track_google_sheet(payload: GoogleSheetSyncRequest):
+    """
+    Auto-read AWBs from Google Sheet (Column H) and execute lifecycle tracking:
+    - Skips already DELIVERED shipments (saves resources).
+    - Tracks active 'On-The-Way' shipments across multi-airline engines concurrently.
+    - Supports start_row (e.g. H110 downwards) and multi-tab scanning.
+    - Upserts Master Cargo Ledger without duplicate rows.
+    - Categorizes into Active On-The-Way vs Delivered Archive.
+    """
+    try:
+        return sheets_tracker.sync_and_track_lifecycle(
+            payload.url,
+            sheet_name=payload.sheet_name,
+            target_col=payload.target_col or "H",
+            start_row=payload.start_row,
+            scan_all_tabs=bool(payload.scan_all_tabs),
+            workers=payload.workers or 5,
+            recheck_delivered=bool(payload.recheck_delivered),
+        )
+    except GoogleSheetAccessError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/sheets/autopilot/start", tags=["Google Sheets Auto-Pilot"])
+def start_autopilot(payload: Optional[AutoPilotConfigRequest] = None):
+    """
+    Activate continuous background lifecycle tracking for Google Sheets.
+    Tracks active/undelivered AWBs (starting from start_row downwards),
+    freezes delivered AWBs, and updates database at regular intervals.
+    """
+    config_dict = payload.model_dump(exclude_unset=True) if payload else {}
+    return autopilot.start(config_dict)
+
+
+@app.post("/api/v1/sheets/autopilot/stop", tags=["Google Sheets Auto-Pilot"])
+def stop_autopilot():
+    """
+    Gracefully pause/stop the Auto-Pilot continuous lifecycle tracking daemon.
+    """
+    return autopilot.stop()
+
+
+@app.get("/api/v1/sheets/autopilot/status", tags=["Google Sheets Auto-Pilot"])
+def get_autopilot_status():
+    """
+    Get live status, countdown to next cycle, total cycles run, and metrics.
+    """
+    return autopilot.get_status()
+
+
+@app.post("/api/v1/sheets/autopilot/run-now", tags=["Google Sheets Auto-Pilot"])
+def run_autopilot_now():
+    """
+    Trigger a manual sync cycle immediately via the Auto-Pilot engine.
+    """
+    return autopilot.run_now()
+
+
+@app.get("/api/v1/sheets/lifecycle", tags=["Google Sheets"])
+def get_lifecycle_shipments(
+    view: str = Query("all", description="View filter: 'active' (On The Way), 'delivered' (Archive), or 'all'"),
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query("ALL"),
+    limit: int = Query(1000, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
+):
+    """
+    Retrieve shipments categorized by lifecycle:
+    - 'active' / 'on_the_way': Shipments currently moving, in-transit, departed, or booked.
+    - 'delivered': Successfully delivered shipments (completed archive).
+    - 'all': Complete ledger.
+    """
+    records = master_ledger.get_all_records(
+        search=search,
+        status=status,
+        lifecycle=view,
+        limit=limit,
+        offset=offset,
+    )
+    stats = master_ledger.get_summary_stats()
+    return {
+        "view": view,
+        "stats": stats,
+        "total_matched": len(records),
+        "records": records,
+    }
 
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])

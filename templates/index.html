@@ -263,6 +263,14 @@
         .modal-close-btn { background: none; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b; padding: 4px 8px; border-radius: 4px; }
         .modal-close-btn:hover { color: #0f172a; background: #e2e8f0; }
         .modal-body { padding: 1.5rem 1.75rem; }
+
+        /* iOS Style Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 48px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        input:checked + .slider { background-color: #16a34a; }
+        input:checked + .slider:before { transform: translateX(22px); }
     </style>
 </head>
 <body>
@@ -297,6 +305,9 @@
                 </button>
                 <button id="btnModeLedger" class="mode-btn" onclick="switchDashboardMode('ledger')">
                     📋 Master Cargo Sheet (Historical Ledger) <span id="navLedgerBadge" style="background:#0f172a;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.75rem;margin-left:6px;font-family:'JetBrains Mono',monospace;">0</span>
+                </button>
+                <button id="btnModeSheets" class="mode-btn" onclick="switchDashboardMode('sheets')">
+                    🌐 Google Sheets Auto-Tracker
                 </button>
             </div>
             <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 11-Carrier Tracking & Anti-Bot Protection</div>
@@ -757,6 +768,245 @@
         </div>
 
 
+        <!-- ================= SECTION 4: GOOGLE SHEETS AUTO-TRACKER ================= -->
+        <div id="sheetsTrackerSection" style="display: none;">
+            <div class="search-card" style="margin-bottom: 1.5rem; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #cbd5e1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                            <span>📊 Google Sheets Auto-Sync & Lifecycle Tracker</span>
+                            <span style="background: #16a34a; color: #ffffff; font-size: 0.75rem; padding: 2px 8px; border-radius: 9999px; font-weight: 700;">Live Two-Way Continuous Tracking</span>
+                        </h2>
+                        <div style="font-size: 0.85rem; color: #64748b;">
+                            Paste your Google Sheet link. The system inspects columns, reads 11-digit AWBs from <strong>Column H</strong> (along with Customer, Destination, Packages, Weights), and continuously tracks active shipments across 11 global airlines until delivered.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Google Sheet URL input & controls -->
+                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end;">
+                    <div style="flex: 1; min-width: 320px;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Google Sheet Link (View / Edit access):</label>
+                        <input type="text" id="gSheetUrlInput" style="width: 100%; padding: 0.65rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 0.9rem;" value="https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/..." />
+                    </div>
+                    <div style="width: 155px;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Target Column:</label>
+                        <select id="gSheetColSelect" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 0.9rem; background: #fff;">
+                            <option value="H" selected>Column H (AWB NO)</option>
+                            <option value="A">Column A</option>
+                            <option value="B">Column B</option>
+                            <option value="C">Column C</option>
+                            <option value="D">Column D</option>
+                            <option value="E">Column E</option>
+                            <option value="F">Column F</option>
+                            <option value="G">Column G</option>
+                            <option value="I">Column I</option>
+                            <option value="J">Column J</option>
+                        </select>
+                    </div>
+                    <div style="width: 175px;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Month / Sheet Tab:</label>
+                        <select id="gSheetTabSelect" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 0.9rem; background: #fff;">
+                            <option value="NOV-26" selected>NOV-26 (Active Tab)</option>
+                            <option value="OCT-26">OCT-26</option>
+                            <option value="SEP-26">SEP-26</option>
+                        </select>
+                    </div>
+                    <div style="width: 140px;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Start Row (e.g. 110):</label>
+                        <input type="number" id="gSheetStartRowInput" value="110" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 0.95rem; text-align: center;" placeholder="110" title="Start scanning from this row downwards (e.g. 110 for H110 downwards)" />
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+                    <label style="display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; color: #334155; cursor: pointer;">
+                        <input type="checkbox" id="gSheetScanAllTabs" style="cursor: pointer;" />
+                        <span>🌐 Auto-Scan All Tabs & Future Month Tabs (detects new month tabs automatically)</span>
+                    </label>
+                </div>
+
+                <!-- Quick Sheet Buttons -->
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">Quick Targets:</span>
+                    <button class="quick-btn" style="border-color: #2563eb; color: #1d4ed8; font-weight: 700; background: #eff6ff;" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', 110)">⭐ User NOV-26 (from H110 - 14 AWBs)</button>
+                    <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', null)">📄 Full NOV-26 Tab (86 AWBs)</button>
+                    <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1OsdRGPcS2fLa8pI6C8rTh8eOYQMRRzhTVM2pOaN4h9U/edit?usp=sharing', 'NOV-26', 110)">📄 User Sheet 2 (OsdRG...)</button>
+                </div>
+
+                <!-- Control Buttons -->
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button class="btn-search" style="background: #0f172a;" id="btnGSheetInspect" onclick="inspectGoogleSheet()">
+                        🔍 Inspect Sheet & Preview Cells
+                    </button>
+                    <button class="btn-bulk-track" style="background: #16a34a;" id="btnGSheetSync" onclick="runGoogleSheetSync()">
+                        ⚡ Auto-Track Lifecycle (Sync Active On-The-Way)
+                    </button>
+                    <button class="btn-bulk-track" style="background: #2563eb;" onclick="downloadSheetLifecycleExcel()">
+                        📥 Download Multi-Tab Excel (.xlsx)
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= AUTO-PILOT CONTINUOUS LIFECYCLE TRACKER CARD ================= -->
+            <div class="search-card" style="margin-bottom: 1.5rem; background: #ffffff; border: 1.5px solid #3b82f6; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.6rem;">🤖</span>
+                        <div>
+                            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <span>Auto-Pilot Continuous Lifecycle Daemon</span>
+                                <span id="autoPilotStatusBadge" class="badge-status bs-skipped" style="font-size: 0.76rem; padding: 3px 10px;">
+                                    <span class="status-dot"></span> <span id="autoPilotStatusText">PAUSED / OFF</span>
+                                </span>
+                            </h3>
+                            <div style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">
+                                Automatically tracks new & active shipments from Google Sheet until <strong>DELIVERED</strong>. Once delivered, shipments freeze and never consume quota again.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- iOS Style Toggle Switch -->
+                    <div style="display: flex; align-items: center; gap: 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 9999px; padding: 6px 14px;">
+                        <span style="font-size: 0.85rem; font-weight: 700; color: #1e293b;" id="toggleLabelText">Auto-Pilot is OFF</span>
+                        <label class="switch">
+                            <input type="checkbox" id="autoPilotToggleCheckbox" onchange="handleAutoPilotToggle(this.checked)" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Daemon Status & Controls Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; align-items: center;">
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Sync Interval</div>
+                        <select id="autoPilotIntervalSelect" onchange="updateAutoPilotInterval()" style="margin-top: 4px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; background: #fff; width: 100%;">
+                            <option value="15">Every 15 Minutes</option>
+                            <option value="30" selected>Every 30 Minutes (Recommended)</option>
+                            <option value="60">Every 1 Hour</option>
+                            <option value="360">Every 6 Hours</option>
+                            <option value="1440">Daily (Every 24 Hours)</option>
+                        </select>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Next Auto-Run In</div>
+                        <div style="font-size: 1.25rem; font-weight: 800; color: #0284c7; font-family: monospace; margin-top: 3px;" id="autoPilotCountdown">---</div>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Cycles Completed</div>
+                        <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-top: 3px;" id="autoPilotCycleCount">0</div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-inspect-premium" style="flex: 1; padding: 12px; justify-content: center; background: #0f172a; color: #fff; border-color: #0f172a; font-size: 0.85rem;" onclick="triggerAutoPilotRunNow()" title="Trigger a cycle right now">
+                            <span>⚡ Run Cycle Now</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sheet Inspection Result Card (Column Mapping & Cells Detected) -->
+            <div id="gSheetInspectCard" style="display: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <span>📋 Sheet Column Mapping & Cell Extraction Preview</span>
+                        <span id="gSheetValidCountBadge" style="background: #dbeafe; color: #1e40af; font-size: 0.8rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">86 AWBs Found</span>
+                    </h3>
+                </div>
+
+                <!-- Column Mapping Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1rem; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;" id="gSheetColMappingWrap">
+                </div>
+
+                <!-- Preview Table (Cells H19, H20, etc.) -->
+                <div style="max-height: 260px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <table class="bulk-table" style="font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #0f172a; color: #fff;">
+                                <th style="width: 50px; text-align: center;">Row</th>
+                                <th style="width: 75px; text-align: center;">Cell</th>
+                                <th style="width: 150px;">AWB Number</th>
+                                <th style="width: 170px;">Carrier / Airline</th>
+                                <th style="width: 170px;">Customer Name</th>
+                                <th style="width: 80px; text-align: center;">Dest</th>
+                                <th style="width: 110px;">IATA Agent</th>
+                                <th style="width: 80px; text-align: center;">Packages</th>
+                                <th style="width: 100px; text-align: right;">Gross Wt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gSheetPreviewTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Lifecycle KPI Counters -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 1.5rem;">
+                <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Sheet AWBs</div>
+                    <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; margin-top: 4px;" id="kpiSheetTotal">0</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Extracted from Column H</div>
+                </div>
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase;">🚚 On The Way (Active)</div>
+                    <div style="font-size: 1.7rem; font-weight: 800; color: #1d4ed8; margin-top: 4px;" id="kpiSheetActive">0</div>
+                    <div style="font-size: 0.75rem; color: #3b82f6; margin-top: 2px;">In-Transit, Departed, Booked</div>
+                </div>
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #15803d; text-transform: uppercase;">✅ Delivered Archive</div>
+                    <div style="font-size: 1.7rem; font-weight: 800; color: #15803d; margin-top: 4px;" id="kpiSheetDelivered">0</div>
+                    <div style="font-size: 0.75rem; color: #22c55e; margin-top: 2px;">Completed POD (Auto-frozen)</div>
+                </div>
+                <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #b45309; text-transform: uppercase;">⚡ Unreachable / Action</div>
+                    <div style="font-size: 1.7rem; font-weight: 800; color: #b45309; margin-top: 4px;" id="kpiSheetUnreachable">0</div>
+                    <div style="font-size: 0.75rem; color: #d97706; margin-top: 2px;">Bot-check or pending sync</div>
+                </div>
+            </div>
+
+            <!-- Lifecycle Filter Tabs & Table -->
+            <div class="search-card" style="padding: 1rem 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 8px;" id="sheetLifecyclePills">
+                        <button class="pill-filter active" id="pillSheetAllBtn" onclick="setSheetLifecycleFilter('all')">📋 All Synchronized (<span id="pillSheetAllCount">0</span>)</button>
+                        <button class="pill-filter" id="pillSheetActiveBtn" style="border-color: #3b82f6; color: #1d4ed8;" onclick="setSheetLifecycleFilter('active')">🚚 On The Way / Active (<span id="pillSheetActiveCount">0</span>)</button>
+                        <button class="pill-filter" id="pillSheetDeliveredBtn" style="border-color: #22c55e; color: #15803d;" onclick="setSheetLifecycleFilter('delivered')">✅ Delivered Archive (<span id="pillSheetDeliveredCount">0</span>)</button>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="sheetSearchInput" placeholder="Filter by customer, AWB, destination..." oninput="filterSheetTable()" style="padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 240px;" />
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="bulk-table-wrap">
+                    <table class="bulk-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th style="width: 170px;">Customer Name</th>
+                                <th style="width: 150px;">AWB No</th>
+                                <th style="width: 95px;">Package</th>
+                                <th style="width: 115px;">Gross Wt</th>
+                                <th style="width: 160px;">IATA / Carrier</th>
+                                <th style="width: 120px;">Flight Code</th>
+                                <th style="width: 110px;">Destination</th>
+                                <th style="width: 175px;">Transition Progress</th>
+                                <th style="width: 130px;">Status of AWB</th>
+                                <th>Latest Milestone Event</th>
+                                <th style="width: 120px;">Last Synced</th>
+                                <th style="width: 80px; text-align: center;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sheetLifecycleTableBody">
+                            <tr><td colspan="13" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                Click <strong>"Inspect Sheet & Preview Cells"</strong> or <strong>"Auto-Track Lifecycle"</strong> above to load shipments.
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     <!-- ================= SHIPMENT INSPECTION MODAL ================= -->
     <div class="modal-overlay" id="shipmentModalOverlay" onclick="if(event.target === this) closeModal()">
         <div class="modal-wrap">
@@ -832,17 +1082,21 @@
             const btnSingle = document.getElementById('btnModeSingle');
             const btnBulk = document.getElementById('btnModeBulk');
             const btnLedger = document.getElementById('btnModeLedger');
+            const btnSheets = document.getElementById('btnModeSheets');
             const secSingle = document.getElementById('singleTrackerSection');
             const secBulk = document.getElementById('bulkTrackerSection');
             const secLedger = document.getElementById('masterLedgerSection');
+            const secSheets = document.getElementById('sheetsTrackerSection');
 
             btnSingle.classList.remove('active');
             btnBulk.classList.remove('active');
             if (btnLedger) btnLedger.classList.remove('active');
+            if (btnSheets) btnSheets.classList.remove('active');
 
             secSingle.style.display = 'none';
             secBulk.style.display = 'none';
             if (secLedger) secLedger.style.display = 'none';
+            if (secSheets) secSheets.style.display = 'none';
 
             if (mode === 'bulk') {
                 btnBulk.classList.add('active');
@@ -852,6 +1106,13 @@
                 if (btnLedger) btnLedger.classList.add('active');
                 if (secLedger) secLedger.style.display = 'block';
                 loadMasterLedger();
+            } else if (mode === 'sheets') {
+                if (btnSheets) btnSheets.classList.add('active');
+                if (secSheets) secSheets.style.display = 'block';
+                logTerminal('Switched view to Google Sheets Auto-Tracker.', 'info');
+                loadSheetLifecycle('all');
+                fetchAutoPilotStatus();
+                ensureAutoPilotPolling();
             } else {
                 btnSingle.classList.add('active');
                 secSingle.style.display = 'block';
@@ -1617,19 +1878,34 @@
         }
 
         function inspectShipment(awb) {
-            const record = currentBulkRecords.find(r => r.awb === awb);
+            let record = currentBulkRecords.find(r => r.awb === awb || r.awb_no === awb);
+            if (!record && typeof masterLedgerData !== 'undefined') {
+                record = masterLedgerData.find(r => r.awb_no === awb || r.awb === awb);
+            }
+            if (!record && typeof currentSheetLifecycleData !== 'undefined') {
+                record = currentSheetLifecycleData.find(r => r.awb_no === awb || r.awb === awb);
+            }
             if (!record) return;
 
-            document.getElementById('modalAwbTitle').innerText = record.awb;
-            document.getElementById('modalCarrierTag').innerText = record.carrier_name;
+            const awbVal = record.awb || record.awb_no || 'AWB';
+            const carrierVal = record.carrier_name || record.carrier || 'CARRIER';
+            const originVal = record.origin || record.source || 'N/A';
+            const destVal = record.destination || 'N/A';
+            const pcsVal = record.pieces || record.packages || '---';
+            const wtVal = record.weight || record.gross_weight || '---';
+            const flVal = record.flight_details || record.flight_code || 'N/A';
+            const timeVal = record.execution_time_sec ? `${record.execution_time_sec}s` : 'Real-time';
+
+            document.getElementById('modalAwbTitle').innerText = awbVal;
+            document.getElementById('modalCarrierTag').innerText = carrierVal;
             document.getElementById('modalCarrierTag').className = `carrier-tag ct-other`;
             document.getElementById('modalStatusBadge').innerText = record.status;
             document.getElementById('modalStatusBadge').className = `status-badge st-${record.status}`;
 
-            document.getElementById('modalRoute').innerText = `${record.origin || 'N/A'} ➔ ${record.destination || 'N/A'}`;
-            document.getElementById('modalPcsWeight').innerText = `${record.pieces || '---'} pcs / ${record.weight || '---'}`;
-            document.getElementById('modalFlight').innerText = record.flight_details || 'N/A';
-            document.getElementById('modalExecTime').innerText = `${record.execution_time_sec}s`;
+            document.getElementById('modalRoute').innerText = `${originVal} ➔ ${destVal}`;
+            document.getElementById('modalPcsWeight').innerText = `${pcsVal} pcs / ${wtVal} kg`;
+            document.getElementById('modalFlight').innerText = flVal;
+            document.getElementById('modalExecTime').innerText = timeVal;
             document.getElementById('modalLatestActivity').innerText = record.latest_activity || record.status_detail || 'N/A';
             document.getElementById('modalRawData').innerText = JSON.stringify(record, null, 2);
 
@@ -2357,6 +2633,509 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 if (navBadge) navBadge.innerText = data.total_records ?? 0;
             }).catch(() => {});
         });
+
+        // ================= GOOGLE SHEETS AUTO-TRACKER LOGIC =================
+        let currentSheetLifecycleData = [];
+        let currentSheetLifecycleFilter = 'all';
+
+        function setGSheetUrl(url, tab, startRow) {
+            const input = document.getElementById('gSheetUrlInput');
+            if (input) input.value = url;
+            const tabSelect = document.getElementById('gSheetTabSelect');
+            if (tabSelect && tab) {
+                let found = false;
+                for (let i = 0; i < tabSelect.options.length; i++) {
+                    if (tabSelect.options[i].value === tab) {
+                        tabSelect.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    const opt = document.createElement('option');
+                    opt.value = tab;
+                    opt.innerText = tab;
+                    tabSelect.appendChild(opt);
+                    tabSelect.value = tab;
+                }
+            }
+            if (startRow !== undefined && startRow !== null) {
+                const sInput = document.getElementById('gSheetStartRowInput');
+                if (sInput) sInput.value = startRow;
+            }
+        }
+
+        async function inspectGoogleSheet() {
+            const url = document.getElementById('gSheetUrlInput')?.value?.trim();
+            const col = document.getElementById('gSheetColSelect')?.value || 'H';
+            const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
+            const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || null;
+            const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
+            const inspectCard = document.getElementById('gSheetInspectCard');
+            const inspectBtn = document.getElementById('btnGSheetInspect');
+
+            if (!url) {
+                showError('Please enter a valid Google Sheet URL.');
+                return;
+            }
+
+            if (inspectBtn) {
+                inspectBtn.disabled = true;
+                inspectBtn.innerHTML = '<span>⏳ Inspecting Google Sheet...</span>';
+            }
+            logTerminal(`[Google Sheets] Connecting to sheet: ${url.substring(0, 45)}... (Start Row: ${startRow || 'Auto'})`, 'info');
+
+            try {
+                const resp = await fetch('/api/v1/sheets/inspect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, target_col: col, sheet_name: tab, start_row: startRow, scan_all_tabs: scanAll })
+                });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Failed to inspect sheet');
+                }
+
+                const tabs = data.all_tabs || data.available_sheets || [];
+                const validCount = data.valid_awbs_found !== undefined ? data.valid_awbs_found : (data.valid_awb_count || 0);
+                const targetCol = data.awb_column || data.target_column || 'H';
+                const tabSelected = data.selected_tab || data.sheet_name || 'NOV-26';
+                const previewList = data.preview_records || data.preview_manifest || [];
+
+                // Populate tabs dropdown if available
+                if (tabs.length > 0) {
+                    const tabSelect = document.getElementById('gSheetTabSelect');
+                    if (tabSelect) {
+                        tabSelect.innerHTML = '';
+                        tabs.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s;
+                            opt.innerText = s;
+                            if (s === tabSelected) opt.selected = true;
+                            tabSelect.appendChild(opt);
+                        });
+                    }
+                }
+
+                // Show inspect card
+                if (inspectCard) inspectCard.style.display = 'block';
+                const badge = document.getElementById('gSheetValidCountBadge');
+                if (badge) badge.innerText = `${validCount} Valid AWBs Found (Col ${targetCol}, Start Row: ${data.start_row || startRow || 'Auto'})`;
+
+                const kpiSheetTotal = document.getElementById('kpiSheetTotal');
+                if (kpiSheetTotal) kpiSheetTotal.innerText = validCount;
+
+                // Render Column Mapping Badges
+                const mapWrap = document.getElementById('gSheetColMappingWrap');
+                if (mapWrap && data.column_mapping) {
+                    const cm = data.column_mapping;
+                    mapWrap.innerHTML = `
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">AWB No:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.awb || 'Col ' + (cm.awb_col || 'H')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">Customer:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.customer || 'Col ' + (cm.customer_col || 'C')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">Destination:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.dest || 'Col ' + (cm.destination_col || 'F')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">IATA Agent:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.iata || 'Col ' + (cm.iata_col || 'G')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">Packages:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.pkg || 'Col ' + (cm.package_col || 'J')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">Gross Wt:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.gr_wt || 'Col ' + (cm.gross_wt_col || 'K')}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <span style="color:#64748b; font-weight:600;">Chargeable Wt:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.ch_wt || 'Col ' + (cm.chargeable_wt_col || 'L')}</strong>
+                        </div>
+                    `;
+                }
+
+                // Render Preview Rows
+                const tbody = document.getElementById('gSheetPreviewTbody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    if (previewList.length > 0) {
+                        previewList.forEach(item => {
+                            const tr = document.createElement('tr');
+                            const pcs = item.packages !== undefined ? item.packages : (item.pieces || '---');
+                            const wt = item.gross_weight !== undefined ? item.gross_weight : (item.weight || '---');
+                            tr.innerHTML = `
+                                <td style="text-align: center; color: #64748b; font-weight:600;">${item.row}</td>
+                                <td style="text-align: center; font-family: monospace; font-weight: 700; color: #0284c7; background: #f0f9ff;">${item.cell}</td>
+                                <td><strong style="font-family: monospace; font-size: 0.92rem; color: #0f172a;">${item.awb}</strong></td>
+                                <td><span style="font-weight:600; color: #334155;">${item.carrier}</span></td>
+                                <td><strong style="color: #1e293b;">${item.customer || '---'}</strong></td>
+                                <td style="text-align: center;"><span style="background: #e2e8f0; font-weight:700; font-size:0.75rem; padding: 2px 6px; border-radius:4px;">${item.destination || '---'}</span></td>
+                                <td><span style="color: #475569; font-size: 0.8rem;">${item.iata || '---'}</span></td>
+                                <td style="text-align: center; font-weight: 600;">${pcs}</td>
+                                <td style="text-align: right; font-weight: 700; color: #0f172a;">${wt ? wt + ' kg' : '---'}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                }
+
+                logTerminal(`[Google Sheets] Inspection successful: ${validCount} AWBs detected in Tab '${tabSelected}' (Col ${targetCol}, Start Row: ${data.start_row || startRow || 'Auto'}).`, 'success');
+            } catch (err) {
+                logTerminal(`[Google Sheets Error] ${err.message}`, 'error');
+                showError(`Google Sheet Error: ${err.message}`);
+            } finally {
+                if (inspectBtn) {
+                    inspectBtn.disabled = false;
+                    inspectBtn.innerHTML = '🔍 Inspect Sheet & Preview Cells';
+                }
+            }
+        }
+
+        async function runGoogleSheetSync() {
+            const url = document.getElementById('gSheetUrlInput')?.value?.trim();
+            const col = document.getElementById('gSheetColSelect')?.value || 'H';
+            const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
+            const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || null;
+            const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
+            const syncBtn = document.getElementById('btnGSheetSync');
+
+            if (!url) {
+                showError('Please enter a valid Google Sheet URL.');
+                return;
+            }
+
+            if (syncBtn) {
+                syncBtn.disabled = true;
+                syncBtn.innerHTML = '<span>⚡ Syncing & Tracking Active Shipments...</span>';
+            }
+            logTerminal(`[Google Sheets Lifecycle Engine] Initiating automated sync across multi-airline portals (Start Row: ${startRow || 'Auto'})...`, 'info');
+
+            try {
+                const resp = await fetch('/api/v1/sheets/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, target_col: col, sheet_name: tab, start_row: startRow, scan_all_tabs: scanAll, workers: 5, recheck_delivered: false })
+                });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Sync failed');
+                }
+
+                const tot = data.total_sheet_awbs !== undefined ? data.total_sheet_awbs : (data.total_manifest_awbs || 0);
+                const act = data.newly_tracked_count !== undefined ? data.newly_tracked_count : (data.active_tracked_count || 0);
+                const skp = data.already_delivered_skipped || 0;
+                logTerminal(`[Google Sheets Lifecycle Engine] Sync Complete! Total: ${tot} AWBs | Active Tracked: ${act} | Already Delivered Skipped: ${skp}.`, 'success');
+                
+                // Refresh lifecycle view & counts
+                await loadSheetLifecycle(currentSheetLifecycleFilter || 'all');
+                await loadMasterLedger();
+            } catch (err) {
+                logTerminal(`[Google Sheets Sync Error] ${err.message}`, 'error');
+                showError(`Sync Error: ${err.message}`);
+            } finally {
+                if (syncBtn) {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '⚡ Auto-Track Lifecycle (Sync Active On-The-Way)';
+                }
+            }
+        }
+
+        async function loadSheetLifecycle(view = 'all') {
+            currentSheetLifecycleFilter = view;
+            try {
+                const resp = await fetch(`/api/v1/sheets/lifecycle?view=${view}`);
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Failed to load lifecycle records');
+
+                currentSheetLifecycleData = data.records || [];
+
+                // Update KPIs
+                if (data.stats) {
+                    const st = data.stats;
+                    const kpiTotal = document.getElementById('kpiSheetTotal');
+                    const kpiActive = document.getElementById('kpiSheetActive');
+                    const kpiDelivered = document.getElementById('kpiSheetDelivered');
+                    const kpiUnreachable = document.getElementById('kpiSheetUnreachable');
+
+                    if (kpiTotal && st.total_records !== undefined) kpiTotal.innerText = st.total_records;
+                    if (kpiActive && st.active_on_the_way !== undefined) kpiActive.innerText = st.active_on_the_way;
+                    if (kpiDelivered && st.delivered !== undefined) kpiDelivered.innerText = st.delivered;
+                    if (kpiUnreachable && st.unreachable !== undefined) kpiUnreachable.innerText = st.unreachable;
+
+                    const pAll = document.getElementById('pillSheetAllCount');
+                    const pAct = document.getElementById('pillSheetActiveCount');
+                    const pDel = document.getElementById('pillSheetDeliveredCount');
+                    if (pAll) pAll.innerText = st.total_records || 0;
+                    if (pAct) pAct.innerText = st.active_on_the_way || 0;
+                    if (pDel) pDel.innerText = st.delivered || 0;
+                }
+
+                renderSheetLifecycleTable();
+            } catch (err) {
+                console.error('Error loading sheet lifecycle:', err);
+            }
+        }
+
+        function setSheetLifecycleFilter(view) {
+            currentSheetLifecycleFilter = view;
+            const btnAll = document.getElementById('pillSheetAllBtn');
+            const btnAct = document.getElementById('pillSheetActiveBtn');
+            const btnDel = document.getElementById('pillSheetDeliveredBtn');
+
+            if (btnAll) btnAll.classList.toggle('active', view === 'all');
+            if (btnAct) btnAct.classList.toggle('active', view === 'active');
+            if (btnDel) btnDel.classList.toggle('active', view === 'delivered');
+
+            loadSheetLifecycle(view);
+        }
+
+        function filterSheetTable() {
+            renderSheetLifecycleTable();
+        }
+
+        function renderSheetLifecycleTable() {
+            const tbody = document.getElementById('sheetLifecycleTableBody');
+            if (!tbody) return;
+
+            const query = (document.getElementById('sheetSearchInput')?.value || '').toLowerCase().trim();
+
+            const filtered = currentSheetLifecycleData.filter(r => {
+                if (!query) return true;
+                const text = `${r.customer_name || ''} ${r.awb_no || ''} ${r.destination || ''} ${r.carrier_name || ''} ${r.flight_code || ''} ${r.status || ''} ${r.iata || ''}`.toLowerCase();
+                return text.includes(query);
+            });
+
+            tbody.innerHTML = '';
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                    No shipments found in this view. Click <strong>"Inspect Sheet & Preview Cells"</strong> or <strong>"Auto-Track Lifecycle"</strong> to load shipments.
+                </td></tr>`;
+                return;
+            }
+
+            filtered.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+
+                // Status badge
+                let statusBadge = `<span class="badge-status bs-transit"><span class="status-dot"></span>${r.status}</span>`;
+                if (r.status === 'DELIVERED') {
+                    statusBadge = `<span class="badge-status bs-delivered"><span class="status-dot"></span>Delivered</span>`;
+                } else if (r.status === 'DEPARTED') {
+                    statusBadge = `<span class="badge-status bs-departed"><span class="status-dot"></span>Departed</span>`;
+                } else if (r.status === 'ARRIVED') {
+                    statusBadge = `<span class="badge-status bs-arrived"><span class="status-dot"></span>Arrived</span>`;
+                } else if (r.status === 'UNREACHABLE') {
+                    statusBadge = `<span class="badge-status bs-unreachable"><span class="status-dot"></span>Unreachable</span>`;
+                } else if (r.status === 'NOT_FOUND') {
+                    statusBadge = `<span class="badge-status bs-notfound"><span class="status-dot"></span>Not Found</span>`;
+                }
+
+                // Carrier tag class
+                let ctClass = 'ct-other';
+                if (r.iata_prefix === '312') ctClass = 'ct-indigo';
+                else if (r.iata_prefix === '703') ctClass = 'ct-neos';
+                else if (r.iata_prefix === '077') ctClass = 'ct-cargoflash';
+                else if (r.iata_prefix === '157') ctClass = 'ct-qatar';
+                else if (r.iata_prefix === '932') ctClass = 'ct-virgin';
+                else if (r.iata_prefix === '125') ctClass = 'ct-britishairways';
+                else if (r.iata_prefix === '229') ctClass = 'ct-kuwait';
+                else if (r.iata_prefix === '176') ctClass = 'ct-emirates';
+                else if (r.iata_prefix === '020') ctClass = 'ct-lufthansa';
+                else if (r.iata_prefix === '098') ctClass = 'ct-airindia';
+                else if (r.iata_prefix === '235') ctClass = 'ct-turkish';
+
+                const shortName = (typeof getShortCarrierName === 'function') ? getShortCarrierName(r.carrier_name, r.iata_prefix) : (r.carrier_name || r.iata_prefix);
+
+                tr.innerHTML = `
+                    <td style="text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
+                    <td><strong style="color: #0f172a;">${r.customer_name || '---'}</strong></td>
+                    <td>
+                        <div class="cell-awb-wrap">
+                            <span class="awb-code">${r.awb_no}</span>
+                            <button class="btn-copy-mini" onclick="copyAwb('${r.awb_no}')" title="Copy AWB">📋</button>
+                        </div>
+                    </td>
+                    <td><span class="pw-badge"><strong>${r.pieces || '---'}</strong> pcs</span></td>
+                    <td><span class="pw-badge"><strong>${r.gross_weight || '---'}</strong> kg</span></td>
+                    <td>
+                        <div class="carrier-chip ${ctClass}">
+                            <span class="prefix-chip">${r.carrier_code || r.iata_prefix}</span>
+                            <span>${shortName}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="fl-chip">${r.flight_code || '---'}</span>
+                    </td>
+                    <td>
+                        <span style="background: #e2e8f0; font-weight: 700; font-size: 0.8rem; padding: 2px 7px; border-radius: 4px; color: #0f172a;">${r.destination || '---'}</span>
+                    </td>
+                    <td>
+                        <div class="route-pill-box">
+                            <span class="apt-code">${r.source || '---'}</span>
+                            <span class="route-arrow">➔</span>
+                            <span class="apt-code">${r.destination || '---'}</span>
+                        </div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td class="msg-cell">
+                        <div class="msg-clamp" title="${r.latest_activity || r.status_detail || ''}">${r.latest_activity || r.status_detail || '---'}</div>
+                    </td>
+                    <td style="font-size: 0.78rem; color: #64748b;">${r.last_updated_at ? r.last_updated_at.substring(11, 19) : '---'}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-inspect-premium" onclick="inspectShipment('${r.awb_no}')" title="View details">👁️ View</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function downloadSheetLifecycleExcel() {
+            window.location.href = '/api/v1/ledger/export/excel';
+        }
+
+        // ================= AUTO-PILOT DAEMON CONTROLS =================
+        let autoPilotPollingTimer = null;
+
+        async function handleAutoPilotToggle(isChecked) {
+            if (isChecked) {
+                await startAutoPilot();
+            } else {
+                await stopAutoPilot();
+            }
+        }
+
+        async function startAutoPilot() {
+            const url = document.getElementById('gSheetUrlInput')?.value?.trim();
+            const col = document.getElementById('gSheetColSelect')?.value || 'H';
+            const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
+            const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || 110;
+            const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
+            const interval = parseInt(document.getElementById('autoPilotIntervalSelect')?.value) || 30;
+
+            logTerminal(`[Auto-Pilot] Starting background lifecycle daemon (every ${interval} mins, Start Row: ${startRow})...`, 'info');
+
+            try {
+                const resp = await fetch('/api/v1/sheets/autopilot/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: url,
+                        target_col: col,
+                        sheet_name: tab,
+                        start_row: startRow,
+                        scan_all_tabs: scanAll,
+                        interval_minutes: interval
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Failed to start Auto-Pilot');
+
+                logTerminal(`[Auto-Pilot] ACTIVATED! Will automatically scan Google Sheet & track active shipments until delivered.`, 'success');
+                await fetchAutoPilotStatus();
+                ensureAutoPilotPolling();
+            } catch (err) {
+                logTerminal(`[Auto-Pilot Error] ${err.message}`, 'error');
+                showError(`Auto-Pilot Error: ${err.message}`);
+                const toggle = document.getElementById('autoPilotToggleCheckbox');
+                if (toggle) toggle.checked = false;
+            }
+        }
+
+        async function stopAutoPilot() {
+            logTerminal(`[Auto-Pilot] Pausing background lifecycle daemon...`, 'info');
+            try {
+                const resp = await fetch('/api/v1/sheets/autopilot/stop', { method: 'POST' });
+                const data = await resp.json();
+                logTerminal(`[Auto-Pilot] Daemon PAUSED.`, 'info');
+                await fetchAutoPilotStatus();
+            } catch (err) {
+                console.error('Error stopping Auto-Pilot:', err);
+            }
+        }
+
+        async function updateAutoPilotInterval() {
+            const toggle = document.getElementById('autoPilotToggleCheckbox');
+            if (toggle && toggle.checked) {
+                await startAutoPilot();
+            }
+        }
+
+        async function triggerAutoPilotRunNow() {
+            logTerminal(`[Auto-Pilot] Manual trigger requested. Running immediate sync cycle...`, 'info');
+            try {
+                const resp = await fetch('/api/v1/sheets/autopilot/run-now', { method: 'POST' });
+                const data = await resp.json();
+                const scanned = data.total_sheet_awbs || 0;
+                const active = data.active_tracked_count || 0;
+                const skipped = data.already_delivered_skipped || 0;
+                logTerminal(`[Auto-Pilot] Immediate cycle complete: ${scanned} scanned, ${active} active tracked, ${skipped} delivered skipped.`, 'success');
+                await fetchAutoPilotStatus();
+                await loadSheetLifecycle(currentSheetLifecycleFilter || 'all');
+                await loadMasterLedger();
+            } catch (err) {
+                logTerminal(`[Auto-Pilot Run Error] ${err.message}`, 'error');
+            }
+        }
+
+        async function fetchAutoPilotStatus() {
+            try {
+                const resp = await fetch('/api/v1/sheets/autopilot/status');
+                const data = await resp.json();
+                if (!resp.ok) return;
+
+                const isRunning = data.is_running;
+                const toggle = document.getElementById('autoPilotToggleCheckbox');
+                const badge = document.getElementById('autoPilotStatusBadge');
+                const txt = document.getElementById('autoPilotStatusText');
+                const lbl = document.getElementById('toggleLabelText');
+                const countdown = document.getElementById('autoPilotCountdown');
+                const cycles = document.getElementById('autoPilotCycleCount');
+
+                if (toggle) toggle.checked = isRunning;
+                if (lbl) lbl.innerText = isRunning ? 'Auto-Pilot is ON' : 'Auto-Pilot is OFF';
+
+                if (badge && txt) {
+                    if (isRunning) {
+                        badge.className = 'badge-status bs-delivered';
+                        txt.innerText = `RUNNING (Every ${data.config?.interval_minutes || 30}m)`;
+                    } else {
+                        badge.className = 'badge-status bs-skipped';
+                        txt.innerText = 'PAUSED / OFF';
+                    }
+                }
+
+                if (cycles) cycles.innerText = data.stats?.total_cycles || 0;
+
+                if (countdown) {
+                    if (isRunning && data.next_run_countdown_sec > 0) {
+                        const m = Math.floor(data.next_run_countdown_sec / 60);
+                        const s = data.next_run_countdown_sec % 60;
+                        countdown.innerText = `${m}m ${s < 10 ? '0' : ''}${s}s`;
+                    } else if (isRunning) {
+                        countdown.innerText = 'Running now...';
+                    } else {
+                        countdown.innerText = '---';
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching Auto-Pilot status:', err);
+            }
+        }
+
+        function ensureAutoPilotPolling() {
+            if (!autoPilotPollingTimer) {
+                autoPilotPollingTimer = setInterval(fetchAutoPilotStatus, 3000);
+            }
+        }
+
+        // Initialize status on load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchAutoPilotStatus();
+        });
+
+
     </script>
 </body>
 </html>
