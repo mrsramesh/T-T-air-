@@ -37,6 +37,7 @@
         .badge-lh { background: var(--primary-lh); color: var(--accent-lh); padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
         .badge-ai { background: var(--primary-ai); color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
         .badge-tk { background: #e30613; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #991b1b; }
+        .badge-ey { background: #b4975a; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #78350f; }
         .title { font-size: 1.35rem; font-weight: 800; color: #1e293b; margin-left: 6px; }
 
         /* Mode Switcher */
@@ -205,6 +206,7 @@
         .ct-lufthansa { background: #eff6ff; color: #05164d; border-color: #bfdbfe; }
         .ct-airindia { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
         .ct-turkish { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .ct-etihad { background: #faf5eb; color: #78350f; border-color: #d4af37; }
         .ct-other { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
 
         /* Status Badge */
@@ -289,6 +291,7 @@
                 <span class="badge-lh">LUFTHANSA (020)</span>
                 <span class="badge-ai">AIR INDIA (098)</span>
                 <span class="badge-tk">TURKISH (235)</span>
+                <span class="badge-ey">ETIHAD (607)</span>
                 <span class="title">Global Cargo Tracker</span>
             </div>
             <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Swagger API ↗</a>
@@ -310,7 +313,7 @@
                     🌐 Google Sheets Auto-Tracker
                 </button>
             </div>
-            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 11-Carrier Tracking & Anti-Bot Protection</div>
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 12-Carrier Tracking & Anti-Bot Protection</div>
         </div>
 
         <div class="error-msg" id="errorBox"></div>
@@ -332,22 +335,21 @@
                         <option value="lufthansa">Lufthansa Cargo (020)</option>
                         <option value="airindia">Air India Cargo (098)</option>
                         <option value="turkish">Turkish Cargo (235)</option>
+                        <option value="etihad">Etihad Cargo (607)</option>
                     </select>
-                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 235-35928502, 077-59068973, 229-18148900) or paste multiple AWBs to auto-track batch" value="235-35928502" />
+                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 607-56316061, 235-35928502, 077-59068973) or paste multiple AWBs to auto-track batch" value="607-56316061" />
                     <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
                 </div>
                 <div class="quick-links">
                     <span>Quick Samples:</span>
+                    <button class="quick-btn" onclick="setAwb('607-56316061', 'etihad')">607-56316061 (Etihad Cargo MXP)</button>
+                    <button class="quick-btn" onclick="setAwb('607-56304721', 'etihad')">607-56304721 (Etihad Cargo JED)</button>
                     <button class="quick-btn" onclick="setAwb('235-35928502', 'turkish')">235-35928502 (Turkish Cargo LHR)</button>
                     <button class="quick-btn" onclick="setAwb('235-36000274', 'turkish')">235-36000274 (Turkish Cargo FRA)</button>
-                    <button class="quick-btn" onclick="setAwb('235-35928513', 'turkish')">235-35928513 (Turkish Cargo JFK)</button>
                     <button class="quick-btn" onclick="setAwb('077-59068973', 'cargoflash')">077-59068973 (EgyptAir LON)</button>
                     <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Delivered)</button>
-                    <button class="quick-btn" onclick="setAwb('229-17349544', 'kuwait')">229-17349544 (Kuwait Departed)</button>
                     <button class="quick-btn" onclick="setAwb('098-32367930', 'airindia')">098-32367930 (Air India DXB)</button>
                     <button class="quick-btn" onclick="setAwb('020-03295493', 'lufthansa')">020-03295493 (Lufthansa FRA)</button>
-                    <button class="quick-btn" onclick="setAwb('020-03742222', 'lufthansa')">020-03742222 (Lufthansa MIA)</button>
-                    <button class="quick-btn" onclick="setAwb('020-02198851', 'lufthansa')">020-02198851 (Lufthansa BCN)</button>
                     <button class="quick-btn" onclick="setAwb('125-24128370', 'britishairways')">125-24128370 (BA JFK)</button>
                     <button class="quick-btn" onclick="setAwb('312-9298-9396', 'indigo')">312-9298-9396 (IndiGo BKK)</button>
                     <button class="quick-btn" onclick="setAwb('703-13715800', 'neos')">703-13715800 (Neos KWI)</button>
@@ -1435,6 +1437,7 @@
                 else if (r.carrier_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.carrier_prefix === '098') ctClass = 'ct-airindia';
                 else if (r.carrier_prefix === '235') ctClass = 'ct-turkish';
+                else if (r.carrier_prefix === '607') ctClass = 'ct-etihad';
 
                 const shortName = getShortCarrierName(r.carrier_name, r.carrier_prefix);
                 const carrierHtml = `
@@ -1698,6 +1701,7 @@
                 else if (r.iata_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.iata_prefix === '098') ctClass = 'ct-airindia';
                 else if (r.iata_prefix === '235') ctClass = 'ct-turkish';
+                else if (r.iata_prefix === '607') ctClass = 'ct-etihad';
 
                 const shortName = getShortCarrierName(r.carrier_name, r.iata_prefix);
                 const carrierHtml = `
@@ -2554,6 +2558,62 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                         `;
                     });
 
+                } else if (cName.includes('Etihad') || cName.includes('607') || cName.includes('EY')) {
+                    // Etihad Cargo (EY)
+                    topBar.style.background = '#faf5eb';
+                    const isDelivered = (data.overview.status || '').toUpperCase() === 'DELIVERED';
+                    const isBooked = (data.overview.status || '').toUpperCase() === 'BOOKED';
+                    document.getElementById('statusPill').style.background = isDelivered ? '#15803d' : (isBooked ? '#b45309' : '#0369a1');
+                    document.getElementById('statusPill').style.color = '#ffffff';
+                    document.getElementById('statusPill').innerText = data.overview.status || 'CONFIRMED';
+
+                    const act = data.overview.latest_activity ? ` &bull; <em>${data.overview.latest_activity}</em>` : '';
+                    const prod = data.overview.product_name ? ` &bull; Product: <strong>${data.overview.product_name}</strong>` : '';
+                    
+                    const ttBtn = `<a href="${data.overview.track_trace_url}" target="_blank" class="btn btn-sm" style="background:#0284c7; color:#fff; padding:4px 10px; border-radius:6px; text-decoration:none; margin-left:8px; font-size:0.75rem; font-weight:600;">🌐 Track on Track-Trace (Primary)</a>`;
+                    const directBtn = `<a href="${data.overview.direct_portal_url}" target="_blank" class="btn btn-sm" style="background:#b45309; color:#fff; padding:4px 10px; border-radius:6px; text-decoration:none; margin-left:6px; font-size:0.75rem; font-weight:600;">✈ Track on Etihad Cargo (Direct)</a>`;
+
+                    document.getElementById('latestBanner').innerHTML = `<strong>Etihad Cargo (EY):</strong> ${data.overview.status}${act}${prod} ${ttBtn} ${directBtn}`;
+
+                    document.getElementById('routeDisplay').innerText = data.overview.route || `${data.overview.origin} ➔ ${data.overview.destination}`;
+                    document.getElementById('pcsWeightDisplay').innerText = `${data.overview.pieces || '---'} pcs / ${data.overview.gross_weight || '---'}`;
+                    document.getElementById('volumeDisplay').innerText = (data.flights && data.flights[0]) ? data.flights[0].flight_no + ' (' + (data.flights[0].segment || '') + ')' : 'Scheduled Flight';
+                    document.getElementById('productDisplay').innerText = `${data.overview.product_name || 'General Cargo'} (${data.overview.special_handling_code || 'GEN'})`;
+
+                    // Flights Tab
+                    const fBody = document.getElementById('flightsBody');
+                    fBody.innerHTML = '';
+                    (data.flights || []).forEach(fl => {
+                        fBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color: #b45309;">${fl.flight_no}</strong></td>
+                                <td>${fl.segment}</td>
+                                <td>${fl.departure_time || fl.flight_date || 'N/A'}</td>
+                                <td>${fl.arrival_time || 'N/A'}</td>
+                                <td>${fl.pieces || data.overview.pieces || '---'} pcs / ${fl.weight || data.overview.gross_weight || '---'}</td>
+                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e;">${fl.status || 'Confirmed'}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    // Milestones Tab
+                    const hBody = document.getElementById('historyBody');
+                    hBody.innerHTML = '';
+                    (data.milestones || []).forEach((m, idx) => {
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Historical</span>';
+                        const pcsWt = [m.pieces ? `${m.pieces} pcs` : '', m.weight ? `${m.weight}` : ''].filter(Boolean).join(' / ') || '---';
+                        hBody.innerHTML += `
+                            <tr>
+                                <td>${m.date} ${m.time}</td>
+                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e;">${m.event_code || 'EVENT'}</span></td>
+                                <td>${m.details || m.status}</td>
+                                <td><strong>${m.station || '---'}</strong></td>
+                                <td>${pcsWt}</td>
+                                <td>${badge}</td>
+                            </tr>
+                        `;
+                    });
+
                 } else {
                     // Air India Cargo
                     topBar.style.background = '#fff5f5';
@@ -2945,6 +3005,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 else if (r.iata_prefix === '020') ctClass = 'ct-lufthansa';
                 else if (r.iata_prefix === '098') ctClass = 'ct-airindia';
                 else if (r.iata_prefix === '235') ctClass = 'ct-turkish';
+                else if (r.iata_prefix === '607') ctClass = 'ct-etihad';
 
                 const shortName = (typeof getShortCarrierName === 'function') ? getShortCarrierName(r.carrier_name, r.iata_prefix) : (r.carrier_name || r.iata_prefix);
 
