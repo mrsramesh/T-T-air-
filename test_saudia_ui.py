@@ -73,7 +73,7 @@ def test_saudia_ui():
         page.locator("button:has-text('Milestones & History')").click()
         page.wait_for_timeout(1000)
 
-        milestone_rows = page.locator("#milestonesBody tr").all_text_contents()
+        milestone_rows = page.locator("#historyBody tr").all_text_contents()
         print("Milestones count:", len(milestone_rows))
         for idx, row in enumerate(milestone_rows[:5]):
             print(f" Milestone {idx+1}:", " | ".join(row.split()))

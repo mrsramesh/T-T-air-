@@ -24,8 +24,29 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: var(--bg); color: var(--text-main); padding: 1.5rem 1rem; }
         .container { max-width: 1440px; margin: 0 auto; width: 96%; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; }
-        .logo-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        /* App Header & Branding */
+        .app-header { margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border); border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05); }
+        .brand-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 1rem; }
+        .brand-main { display: flex; align-items: center; gap: 14px; }
+        .brand-icon-wrap { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+        .brand-title { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 1.2; }
+        .brand-sub { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #64748b; font-weight: 500; margin-top: 2px; flex-wrap: wrap; }
+        .live-dot-beacon { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.25); display: inline-block; animation: beaconPulse 2s infinite; }
+        .sub-sep { color: #cbd5e1; }
+        @keyframes beaconPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.8; } }
+
+        .btn-swagger { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1.5px solid var(--border); color: #334155; padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 0.84rem; text-decoration: none; transition: all 0.2s; }
+        .btn-swagger:hover { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+
+        /* Carrier Strip */
+        .carrier-strip { display: flex; align-items: center; gap: 10px; padding-top: 0.85rem; border-top: 1px solid #f1f5f9; overflow-x: auto; scrollbar-width: thin; }
+        .carrier-strip-label { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .strip-pill-count { background: #0f172a; color: white; border-radius: 9999px; padding: 1px 7px; font-size: 0.72rem; }
+        .carrier-tags-container { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .c-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.2px; text-decoration: none; transition: all 0.15s; white-space: nowrap; }
+        .c-pill .c-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+        .c-pill:hover { transform: translateY(-1px); }
+
         .badge-6e { background: #002d62; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #1e40af; }
         .badge-no { background: #991b1b; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #7f1d1d; }
         .badge-ms { background: #002d62; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #1e40af; }
@@ -39,7 +60,6 @@
         .badge-tk { background: #e30613; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #991b1b; }
         .badge-ey { background: #b4975a; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #78350f; }
         .badge-sv { background: #006c35; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #004d26; }
-        .title { font-size: 1.35rem; font-weight: 800; color: #1e293b; margin-left: 6px; }
 
         /* Mode Switcher */
         .mode-switch-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px; background: white; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
@@ -49,41 +69,253 @@
         .mode-btn:hover:not(.active) { color: #0f172a; background: #e2e8f0; }
 
         /* Single Tracker Styles */
-        .search-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
-        .form-row { display: flex; gap: 12px; }
-        .carrier-select { padding: 0.85rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-weight: 600; background: white; outline: none; }
-        input[type="text"] { flex: 1; padding: 0.85rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; }
-        input[type="text"]:focus { border-color: #2563eb; }
-        button.btn-search { background: #2563eb; color: white; border: none; padding: 0.85rem 1.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: opacity 0.2s; }
-        button.btn-search:hover { opacity: 0.9; }
-        .quick-links { margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .quick-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #334155; font-family: monospace; font-size: 0.82rem; }
-        .quick-btn:hover { background: #e2e8f0; }
-        .result-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; margin-bottom: 1.5rem; }
-        .card-top { padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .awb-num { font-size: 1.4rem; font-weight: 700; }
-        .status-pill { padding: 5px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
-        .banner { padding: 1rem 1.75rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; font-size: 0.95rem; font-weight: 500; color: #1e40af; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border); }
-        .m-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
-        .m-val { font-size: 1.15rem; font-weight: 700; color: #1e293b; }
+        .search-card { background: var(--card-bg); border-radius: 14px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05); margin-bottom: 1.5rem; }
+        .form-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .select-wrap { position: relative; min-width: 220px; }
+        .carrier-select { width: 100%; padding: 0.88rem 2.2rem 0.88rem 1rem; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.92rem; font-weight: 600; background: white; outline: none; appearance: none; cursor: pointer; color: #1e293b; transition: all 0.2s; }
+        .carrier-select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .select-caret { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b; font-size: 0.72rem; }
+
+        .input-wrap { position: relative; flex: 1; min-width: 280px; display: flex; align-items: center; }
+        .input-icon-left { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; display: flex; align-items: center; }
+        .input-awb { width: 100%; padding: 0.88rem 2.4rem 0.88rem 2.5rem; border: 1.5px solid var(--border); border-radius: 10px; font-size: 1rem; font-family: 'JetBrains Mono', monospace; font-weight: 600; outline: none; transition: all 0.2s; color: #0f172a; }
+        .input-awb:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .btn-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; display: none; line-height: 1; }
+        .btn-clear:hover { color: #0f172a; background: #f1f5f9; }
+
+        /* Dynamic Search Button */
+        button.btn-search {
+            position: relative;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff;
+            border: none;
+            padding: 0.88rem 1.75rem;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.96rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 175px;
+            height: 48px;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.25);
+            outline: none;
+        }
+        button.btn-search:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(37,99,235,0.35);
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        }
+        button.btn-search:active:not(:disabled) { transform: translateY(0); }
+        button.btn-search:disabled, button.btn-search.btn-loading {
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+            opacity: 0.95;
+        }
+        .btn-kbd {
+            background: rgba(255,255,255,0.22);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-family: 'JetBrains Mono', monospace;
+            margin-left: 2px;
+        }
+        .btn-spinner {
+            width: 17px;
+            height: 17px;
+            border: 2.5px solid rgba(255,255,255,0.35);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: btnSpin 0.75s linear infinite;
+            display: inline-block;
+        }
+        @keyframes btnSpin { to { transform: rotate(360deg); } }
+
+        /* Quick Samples */
+        .quick-links { margin-top: 14px; font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .quick-label { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: #475569; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
+        .quick-btn {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 5px 11px;
+            border-radius: 7px;
+            cursor: pointer;
+            color: #334155;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .quick-btn:hover:not(:disabled) {
+            background: #ffffff;
+            border-color: #94a3b8;
+            color: #0f172a;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .quick-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .qb-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .qb-sv .qb-dot { background: #006c35; }
+        .qb-ey .qb-dot { background: #b4975a; }
+        .qb-tk .qb-dot { background: #e30613; }
+        .qb-ms .qb-dot { background: #002d62; }
+        .qb-kw .qb-dot { background: #0284c7; }
+        .qb-ai .qb-dot { background: #d71921; }
+        .qb-lh .qb-dot { background: #05164d; }
+        .qb-ba .qb-dot { background: #00205b; }
+        .qb-6e .qb-dot { background: #002d62; }
+        .qb-no .qb-dot { background: #991b1b; }
+
+        /* ================= HIGH-TECH TRACKING RADAR & LOADER ================= */
+        .modern-loader-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1.5px solid #bfdbfe;
+            box-shadow: 0 10px 30px -5px rgba(37,99,235,0.12), 0 4px 6px -2px rgba(37,99,235,0.05);
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            position: relative;
+        }
+        .loader-visual-zone {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            flex-wrap: wrap;
+        }
+        .radar-box {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #eff6ff 0%, #dbeafe 100%);
+            border: 2px solid #bfdbfe;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            box-shadow: 0 0 16px rgba(37,99,235,0.15);
+        }
+        .radar-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 1px solid rgba(37,99,235,0.25);
+            animation: radarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+        }
+        .radar-ring:nth-child(2) { animation-delay: 0.6s; }
+        .radar-sweep-hand {
+            position: absolute;
+            width: 50%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, #2563eb 100%);
+            top: 50%;
+            left: 50%;
+            transform-origin: 0% 0%;
+            animation: radarSweep 1.8s linear infinite;
+        }
+        .radar-plane-center {
+            position: relative;
+            z-index: 2;
+            color: #2563eb;
+            animation: planeHover 2s ease-in-out infinite;
+        }
+        @keyframes radarPulse {
+            0% { transform: scale(0.4); opacity: 1; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        @keyframes radarSweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes planeHover {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+
+        .loader-info-wrap { flex: 1; min-width: 280px; }
+        .loader-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .loader-main-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+        .loader-timer-pill { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700; padding: 3px 9px; border-radius: 9999px; }
+        .loader-step-desc { font-size: 0.88rem; color: #475569; margin-bottom: 12px; font-weight: 500; min-height: 20px; }
+        
+        .loader-bar-outer {
+            width: 100%;
+            height: 7px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .loader-bar-inner {
+            height: 100%;
+            width: 20%;
+            background: linear-gradient(90deg, #2563eb, #38bdf8, #10b981);
+            border-radius: 9999px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            background-size: 200% 100%;
+            animation: barGlow 1.5s ease infinite;
+        }
+        @keyframes barGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .loader-badges-grid { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .l-sec-badge { background: #f8fafc; border: 1px solid var(--border); color: #475569; padding: 3px 9px; border-radius: 6px; font-size: 0.73rem; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+        .l-sec-dot { width: 5px; height: 5px; border-radius: 50%; background: #16a34a; }
+
+        /* Result Card & Metrics */
+        .result-card { background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06); overflow: hidden; display: none; margin-bottom: 1.5rem; }
+        .card-top { padding: 1.25rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+        .awb-num { font-size: 1.5rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.5px; color: #0f172a; }
+        .btn-copy-chip { background: #ffffff; border: 1.5px solid var(--border); color: #475569; border-radius: 6px; padding: 3px 9px; cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+        .btn-copy-chip:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+        .status-pill { padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; display: inline-block; animation: beaconPulse 1.8s infinite; }
+        .banner { padding: 0.95rem 1.75rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; font-size: 0.9rem; font-weight: 500; color: #1e40af; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); background: #ffffff; }
+        .metric-box { background: #f8fafc; border: 1.5px solid var(--border); border-radius: 10px; padding: 0.9rem 1.15rem; transition: all 0.15s ease; }
+        .metric-box:hover { background: #ffffff; border-color: #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.04); }
+        .m-lbl { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 5px; }
+        .m-val { font-size: 1.25rem; font-weight: 800; color: #0f172a; font-family: 'JetBrains Mono', monospace; line-height: 1.2; }
+        
         .station-cards-wrap { padding: 1.25rem 1.75rem; background: #f8fafc; border-bottom: 1px solid var(--border); }
-        .station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
-        .station-box { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); }
-        .station-title { font-weight: 700; font-size: 1rem; color: #0f3d6e; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-        .station-detail { font-size: 0.85rem; margin-bottom: 4px; }
-        .tab-bar { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; }
-        .tab-item { padding: 1rem 1.25rem; border: none; background: none; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+        .station-box { background: #ffffff; padding: 1rem 1.2rem; border-radius: 10px; border: 1.5px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: all 0.15s ease; }
+        .station-box:hover { border-color: #cbd5e1; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .station-title { font-weight: 700; font-size: 0.94rem; color: #0f172a; display: flex; align-items: center; gap: 7px; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
+        .station-detail { font-size: 0.83rem; color: #334155; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+
+        .tab-bar { display: flex; border-bottom: 1px solid var(--border); background: #ffffff; padding: 0 1.75rem; gap: 8px; }
+        .tab-item { padding: 0.9rem 1.25rem; border: none; background: none; font-weight: 700; font-size: 0.92rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
         .tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }
-        .tab-panel { padding: 1.5rem 1.75rem; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th { padding: 0.75rem 1rem; background: #f8fafc; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
-        tr:hover { background: #f8fafc; }
-        .badge-ev { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-family: monospace; }
-        .badge-latest { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.8rem; }
-        .loader { display: none; text-align: center; padding: 2.5rem; font-weight: 600; color: var(--text-muted); font-size: 1.05rem; }
-        .error-msg { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; font-weight: 500; }
+        .tab-item:hover:not(.active) { color: #0f172a; }
+        .tab-panel { padding: 1.25rem 1.75rem; overflow-x: auto; }
+        
+        /* Universal Enterprise Table */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 0.88rem; }
+        th { padding: 0.85rem 1rem; background: #f8fafc; color: #475569; font-weight: 700; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+        td { padding: 0.85rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #1e293b; }
+        tr:hover td { background-color: #f8fafc; }
+        
+        .badge-ev { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; display: inline-block; white-space: nowrap; }
+        .badge-latest { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 3px 8px; border-radius: 9999px; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .badge-latest::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block; animation: beaconPulse 2s infinite; }
+        .error-msg { display: none; background: #fef2f2; border: 1.5px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; font-weight: 600; font-size: 0.9rem; }
 
         /* Bulk & Multi-AWB Engine Styles */
         .bulk-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
@@ -275,30 +507,100 @@
         .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         input:checked + .slider { background-color: #16a34a; }
         input:checked + .slider:before { transform: translateX(22px); }
+        /* Google Sheets & Form Styling */
+        .gsheet-config-card { background: #ffffff; border-radius: 16px; padding: 1.5rem; border: 1.5px solid var(--border); box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05); margin-bottom: 1.5rem; }
+        .gsheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem; flex-wrap: wrap; gap: 12px; }
+        .gsheet-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+        .gsheet-badge-pill { background: #16a34a; color: #ffffff; font-size: 0.74rem; padding: 3px 9px; border-radius: 9999px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+        .gsheet-subtitle { font-size: 0.84rem; color: #64748b; margin-top: 3px; }
+        .gsheet-grid-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: flex-end; }
+        .gsheet-input-wrap { flex: 1; min-width: 300px; }
+        .gsheet-label { font-size: 0.76rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 5px; }
+        .gsheet-input { width: 100%; padding: 0.75rem 0.95rem; border: 1.5px solid var(--border); border-radius: 9px; font-size: 0.9rem; background: #ffffff; color: #0f172a; outline: none; transition: all 0.2s; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .gsheet-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .gsheet-select { width: 100%; padding: 0.75rem 0.8rem; border: 1.5px solid var(--border); border-radius: 9px; font-weight: 600; font-size: 0.88rem; background: #ffffff; color: #0f172a; outline: none; cursor: pointer; transition: all 0.2s; }
+        .gsheet-select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        
+        .gsheet-checkbox-label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 600; color: #334155; cursor: pointer; user-select: none; }
+        .gsheet-checkbox-label input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
+        
+        .gsheet-targets-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .gsheet-actions-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+        /* Auto-Pilot Daemon Executive Card */
+        .autopilot-card { background: #ffffff; border-radius: 16px; border: 1.5px solid #bfdbfe; box-shadow: 0 10px 25px -5px rgba(37,99,235,0.08), 0 4px 6px -2px rgba(37,99,235,0.04); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .autopilot-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem; margin-bottom: 1.25rem; }
+        .autopilot-left { display: flex; align-items: center; gap: 12px; }
+        .autopilot-icon-wrap { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+        .autopilot-title { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px; }
+        .autopilot-desc { font-size: 0.83rem; color: #64748b; margin-top: 2px; }
+        .autopilot-toggle-pill { display: flex; align-items: center; gap: 12px; background: #f8fafc; border: 1.5px solid var(--border); border-radius: 9999px; padding: 6px 14px; }
+        .autopilot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; align-items: center; }
+        .autopilot-stat-box { background: #f8fafc; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+        .autopilot-stat-box .lbl { font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+        .autopilot-stat-box .val { font-size: 1.25rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-top: 3px; }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Top Branding Header -->
-        <div class="header">
-            <div class="logo-wrap">
-                <span class="badge-6e">INDIGO (312)</span>
-                <span class="badge-no">NEOS AIR (703)</span>
-                <span class="badge-ms">EGYPTAIR (077)</span>
-                <span class="badge-qr">QATAR (157)</span>
-                <span class="badge-vs">VIRGIN (932)</span>
-                <span class="badge-ba">BRITISH AIRWAYS (125)</span>
-                <span class="badge-kw">KUWAIT (229)</span>
-                <span class="badge-ek">EMIRATES (176)</span>
-                <span class="badge-lh">LUFTHANSA (020)</span>
-                <span class="badge-ai">AIR INDIA (098)</span>
-                <span class="badge-tk">TURKISH (235)</span>
-                <span class="badge-ey">ETIHAD (607)</span>
-                <span class="badge-sv">SAUDIA (065)</span>
-                <span class="title">Global Cargo Tracker</span>
+        <header class="app-header">
+            <div class="brand-bar">
+                <div class="brand-main">
+                    <div class="brand-icon-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="brand-title">Global Cargo Tracker</h1>
+                        <div class="brand-sub">
+                            <span class="live-dot-beacon"></span>
+                            <span>13 Airlines Online</span>
+                            <span class="sub-sep">•</span>
+                            <span>Anti-Bot Stealth Engine</span>
+                            <span class="sub-sep">•</span>
+                            <span>Zero-Fake Data Guard</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <a href="/docs" target="_blank" class="btn-swagger">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Swagger REST API</span>
+                    </a>
+                </div>
             </div>
-            <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Swagger API ↗</a>
-        </div>
+
+            <!-- Carrier Status Ribbon -->
+            <div class="carrier-strip">
+                <div class="carrier-strip-label">
+                    <span class="strip-pill-count">13</span>
+                    <span>Direct Integrations:</span>
+                </div>
+                <div class="carrier-tags-container">
+                    <span class="c-pill badge-sv" title="Saudia Cargo - Prefix 065"><span class="c-dot" style="background:#22c55e;"></span>SAUDIA (065)</span>
+                    <span class="c-pill badge-ey" title="Etihad Cargo - Prefix 607"><span class="c-dot" style="background:#22c55e;"></span>ETIHAD (607)</span>
+                    <span class="c-pill badge-tk" title="Turkish Cargo - Prefix 235"><span class="c-dot" style="background:#22c55e;"></span>TURKISH (235)</span>
+                    <span class="c-pill badge-ai" title="Air India Cargo - Prefix 098"><span class="c-dot" style="background:#22c55e;"></span>AIR INDIA (098)</span>
+                    <span class="c-pill badge-lh" title="Lufthansa Cargo - Prefix 020"><span class="c-dot" style="background:#22c55e;"></span>LUFTHANSA (020)</span>
+                    <span class="c-pill badge-ek" title="Emirates SkyCargo - Prefix 176"><span class="c-dot" style="background:#22c55e;"></span>EMIRATES (176)</span>
+                    <span class="c-pill badge-kw" title="Kuwait Airways - Prefix 229"><span class="c-dot" style="background:#22c55e;"></span>KUWAIT (229)</span>
+                    <span class="c-pill badge-ba" title="British Airways Cargo - Prefix 125"><span class="c-dot" style="background:#22c55e;"></span>BRITISH AIRWAYS (125)</span>
+                    <span class="c-pill badge-vs" title="Virgin Atlantic Cargo - Prefix 932"><span class="c-dot" style="background:#22c55e;"></span>VIRGIN (932)</span>
+                    <span class="c-pill badge-qr" title="Qatar Airways Cargo - Prefix 157"><span class="c-dot" style="background:#22c55e;"></span>QATAR (157)</span>
+                    <span class="c-pill badge-ms" title="EgyptAir Cargo - Prefix 077"><span class="c-dot" style="background:#22c55e;"></span>EGYPTAIR (077)</span>
+                    <span class="c-pill badge-no" title="Neos Air Cargo - Prefix 703"><span class="c-dot" style="background:#22c55e;"></span>NEOS AIR (703)</span>
+                    <span class="c-pill badge-6e" title="IndiGo CarGo - Prefix 312"><span class="c-dot" style="background:#22c55e;"></span>INDIGO (312)</span>
+                </div>
+            </div>
+        </header>
 
         <!-- Mode Switcher (Single vs Bulk Engine) -->
         <div class="mode-switch-wrap">
@@ -325,49 +627,109 @@
         <div id="singleTrackerSection">
             <div class="search-card">
                 <div class="form-row">
-                    <select id="carrierSelect" class="carrier-select">
-                        <option value="auto">Auto-Detect Carrier</option>
-                        <option value="indigo">IndiGo CarGo (312)</option>
-                        <option value="neos">Neos Air Cargo (703)</option>
-                        <option value="cargoflash">EgyptAir Cargo (077)</option>
-                        <option value="qatar">Qatar Airways Cargo (157)</option>
-                        <option value="virgin">Virgin Atlantic Cargo (932)</option>
-                        <option value="britishairways">British Airways Cargo (125)</option>
-                        <option value="kuwait">Kuwait Airways (229)</option>
-                        <option value="emirates">Emirates SkyCargo (176)</option>
-                        <option value="lufthansa">Lufthansa Cargo (020)</option>
-                        <option value="airindia">Air India Cargo (098)</option>
-                        <option value="turkish">Turkish Cargo (235)</option>
-                        <option value="etihad">Etihad Cargo (607)</option>
-                        <option value="saudia">Saudia Cargo (065)</option>
-                    </select>
-                    <input type="text" id="awbInput" placeholder="Enter AWB (e.g. 065-4710-2484, 607-56316061, 235-35928502) or paste multiple AWBs to auto-track batch" value="065-4710-2484" />
-                    <button class="btn-search" onclick="trackAWB()">Track Shipment</button>
+                    <div class="select-wrap">
+                        <select id="carrierSelect" class="carrier-select">
+                            <option value="auto">⚡ Auto-Detect Carrier</option>
+                            <option value="saudia">✈ Saudia Cargo (065)</option>
+                            <option value="etihad">✈ Etihad Cargo (607)</option>
+                            <option value="turkish">✈ Turkish Cargo (235)</option>
+                            <option value="airindia">✈ Air India Cargo (098)</option>
+                            <option value="lufthansa">✈ Lufthansa Cargo (020)</option>
+                            <option value="emirates">✈ Emirates SkyCargo (176)</option>
+                            <option value="kuwait">✈ Kuwait Airways (229)</option>
+                            <option value="britishairways">✈ British Airways (125)</option>
+                            <option value="virgin">✈ Virgin Atlantic (932)</option>
+                            <option value="qatar">✈ Qatar Airways (157)</option>
+                            <option value="cargoflash">✈ EgyptAir Cargo (077)</option>
+                            <option value="neos">✈ Neos Air (703)</option>
+                            <option value="indigo">✈ IndiGo CarGo (312)</option>
+                        </select>
+                        <div class="select-caret">▼</div>
+                    </div>
+                    
+                    <div class="input-wrap">
+                        <span class="input-icon-left">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </span>
+                        <input type="text" id="awbInput" class="input-awb" placeholder="Enter AWB (e.g. 065-4710-2484, 607-56316061, 235-35928502) or paste multiple..." value="065-4710-2484" autocomplete="off" spellcheck="false" onkeydown="handleAwbKeyDown(event)" oninput="updateClearButton()" />
+                        <button type="button" class="btn-clear" id="btnClearInput" onclick="clearAwbInput()" title="Clear input">×</button>
+                    </div>
+
+                    <button class="btn-search" id="trackBtn" onclick="trackAWB()">
+                        <span class="btn-content-default" style="display: inline-flex; align-items: center; gap: 7px;">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span>Track Shipment</span>
+                            <span class="btn-kbd">↵</span>
+                        </span>
+                        <span class="btn-content-loading" style="display: none; align-items: center; gap: 8px;">
+                            <span class="btn-spinner"></span>
+                            <span class="loading-label">Tracking Shipment...</span>
+                        </span>
+                    </button>
                 </div>
+
                 <div class="quick-links">
-                    <span>Quick Samples:</span>
-                    <button class="quick-btn" onclick="setAwb('065-4710-2484', 'saudia')">065-4710-2484 (Saudia Cargo IST)</button>
-                    <button class="quick-btn" onclick="setAwb('607-56316061', 'etihad')">607-56316061 (Etihad Cargo MXP)</button>
-                    <button class="quick-btn" onclick="setAwb('607-56304721', 'etihad')">607-56304721 (Etihad Cargo JED)</button>
-                    <button class="quick-btn" onclick="setAwb('235-35928502', 'turkish')">235-35928502 (Turkish Cargo LHR)</button>
-                    <button class="quick-btn" onclick="setAwb('235-36000274', 'turkish')">235-36000274 (Turkish Cargo FRA)</button>
-                    <button class="quick-btn" onclick="setAwb('077-59068973', 'cargoflash')">077-59068973 (EgyptAir LON)</button>
-                    <button class="quick-btn" onclick="setAwb('229-18148900', 'kuwait')">229-18148900 (Kuwait Delivered)</button>
-                    <button class="quick-btn" onclick="setAwb('098-32367930', 'airindia')">098-32367930 (Air India DXB)</button>
-                    <button class="quick-btn" onclick="setAwb('020-03295493', 'lufthansa')">020-03295493 (Lufthansa FRA)</button>
-                    <button class="quick-btn" onclick="setAwb('125-24128370', 'britishairways')">125-24128370 (BA JFK)</button>
-                    <button class="quick-btn" onclick="setAwb('312-9298-9396', 'indigo')">312-9298-9396 (IndiGo BKK)</button>
-                    <button class="quick-btn" onclick="setAwb('703-13715800', 'neos')">703-13715800 (Neos KWI)</button>
+                    <span class="quick-label">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        Quick Samples:
+                    </span>
+                    <button class="quick-btn qb-sv" onclick="setAwb('065-4710-2484', 'saudia')"><span class="qb-dot"></span>065-4710-2484 (Saudia IST)</button>
+                    <button class="quick-btn qb-ey" onclick="setAwb('607-56316061', 'etihad')"><span class="qb-dot"></span>607-56316061 (Etihad MXP)</button>
+                    <button class="quick-btn qb-ey" onclick="setAwb('607-56304721', 'etihad')"><span class="qb-dot"></span>607-56304721 (Etihad JED)</button>
+                    <button class="quick-btn qb-tk" onclick="setAwb('235-35928502', 'turkish')"><span class="qb-dot"></span>235-35928502 (Turkish LHR)</button>
+                    <button class="quick-btn qb-tk" onclick="setAwb('235-36000274', 'turkish')"><span class="qb-dot"></span>235-36000274 (Turkish FRA)</button>
+                    <button class="quick-btn qb-ms" onclick="setAwb('077-59068973', 'cargoflash')"><span class="qb-dot"></span>077-59068973 (EgyptAir LON)</button>
+                    <button class="quick-btn qb-kw" onclick="setAwb('229-18148900', 'kuwait')"><span class="qb-dot"></span>229-18148900 (Kuwait Delivered)</button>
+                    <button class="quick-btn qb-ai" onclick="setAwb('098-32367930', 'airindia')"><span class="qb-dot"></span>098-32367930 (Air India DXB)</button>
+                    <button class="quick-btn qb-lh" onclick="setAwb('020-03295493', 'lufthansa')"><span class="qb-dot"></span>020-03295493 (Lufthansa FRA)</button>
+                    <button class="quick-btn qb-ba" onclick="setAwb('125-24128370', 'britishairways')"><span class="qb-dot"></span>125-24128370 (BA JFK)</button>
+                    <button class="quick-btn qb-6e" onclick="setAwb('312-9298-9396', 'indigo')"><span class="qb-dot"></span>312-9298-9396 (IndiGo BKK)</button>
+                    <button class="quick-btn qb-no" onclick="setAwb('703-13715800', 'neos')"><span class="qb-dot"></span>703-13715800 (Neos KWI)</button>
                 </div>
             </div>
 
-            <div class="loader" id="loader">Fetching tracking details from airline cargo portal...</div>
+            <!-- Modern Animated Tracking Radar Loader -->
+            <div class="modern-loader-card" id="loader" style="display: none;">
+                <div class="loader-visual-zone">
+                    <div class="radar-box">
+                        <div class="radar-ring"></div>
+                        <div class="radar-ring"></div>
+                        <div class="radar-sweep-hand"></div>
+                        <div class="radar-plane-center">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="loader-info-wrap">
+                        <div class="loader-top-row">
+                            <span class="loader-main-title">
+                                <span>Querying Airline Mainframe & Track-Trace Systems</span>
+                            </span>
+                            <span class="loader-timer-pill" id="loaderTimer">⏱ 00:00s</span>
+                        </div>
+                        <div class="loader-step-desc" id="loaderDynamicStep">Connecting to airline cargo portal...</div>
+                        <div class="loader-bar-outer">
+                            <div class="loader-bar-inner" id="loaderProgressBar"></div>
+                        </div>
+                        <div class="loader-badges-grid">
+                            <span class="l-sec-badge"><span class="l-sec-dot"></span> IATA Prefix Resolution</span>
+                            <span class="l-sec-badge"><span class="l-sec-dot"></span> Anti-Bot Perimeter Stealth</span>
+                            <span class="l-sec-badge"><span class="l-sec-dot"></span> Flight Manifest & Route Sync</span>
+                            <span class="l-sec-badge"><span class="l-sec-dot"></span> Zero-Fake Data Guard</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="result-card" id="resultCard">
                 <div class="card-top" id="cardTop">
                     <div>
                         <span id="carrierTag" style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 2px;">AIRLINE</span>
-                        <div class="awb-num" id="awbDisplay">000-00000000</div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="awb-num" id="awbDisplay">000-00000000</div>
+                            <button class="btn-copy-chip" onclick="copyCurrentAwb()" id="btnCopyAwb" title="Copy AWB Number">📋 Copy</button>
+                        </div>
                     </div>
                     <div class="status-pill" id="statusPill" style="background: #16a34a; color: white;">STATUS</div>
                 </div>
@@ -375,19 +737,19 @@
                 <div class="banner" id="latestBanner">Latest Event: ...</div>
 
                 <div class="metrics-grid">
-                    <div>
+                    <div class="metric-box">
                         <div class="m-lbl">Origin ➔ Destination</div>
                         <div class="m-val" id="routeDisplay">--- ➔ ---</div>
                     </div>
-                    <div>
+                    <div class="metric-box">
                         <div class="m-lbl">Pieces & Weight</div>
                         <div class="m-val" id="pcsWeightDisplay">--- pcs / --- KG</div>
                     </div>
-                    <div>
+                    <div class="metric-box">
                         <div class="m-lbl">Volume / Details</div>
                         <div class="m-val" id="volumeDisplay">---</div>
                     </div>
-                    <div>
+                    <div class="metric-box">
                         <div class="m-lbl">Commodity / Current Status</div>
                         <div class="m-val" id="productDisplay">---</div>
                     </div>
@@ -404,35 +766,39 @@
                 </div>
 
                 <div class="tab-panel" id="panelFlights">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Flight</th>
-                                <th>Origin ➔ Destination</th>
-                                <th>Date / Departure</th>
-                                <th>Arrival / Details</th>
-                                <th>Pieces / Weight</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="flightsBody"></tbody>
-                    </table>
+                    <div class="bulk-table-wrap">
+                        <table class="bulk-table">
+                            <thead>
+                                <tr>
+                                    <th>Flight</th>
+                                    <th>Origin ➔ Destination</th>
+                                    <th>Date / Departure</th>
+                                    <th>Arrival / Details</th>
+                                    <th>Pieces / Weight</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="flightsBody"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="tab-panel" id="panelHistory" style="display: none;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date & Time</th>
-                                <th>Code</th>
-                                <th>Description</th>
-                                <th>Station</th>
-                                <th>Flight / Pieces</th>
-                                <th>State</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyBody"></tbody>
-                    </table>
+                    <div class="bulk-table-wrap">
+                        <table class="bulk-table">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Code</th>
+                                    <th>Description</th>
+                                    <th>Station</th>
+                                    <th>Flight / Pieces</th>
+                                    <th>State</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -777,28 +1143,28 @@
 
         <!-- ================= SECTION 4: GOOGLE SHEETS AUTO-TRACKER ================= -->
         <div id="sheetsTrackerSection" style="display: none;">
-            <div class="search-card" style="margin-bottom: 1.5rem; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #cbd5e1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 10px;">
+            <div class="gsheet-config-card">
+                <div class="gsheet-header">
                     <div>
-                        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                        <h2 class="gsheet-title">
                             <span>📊 Google Sheets Auto-Sync & Lifecycle Tracker</span>
-                            <span style="background: #16a34a; color: #ffffff; font-size: 0.75rem; padding: 2px 8px; border-radius: 9999px; font-weight: 700;">Live Two-Way Continuous Tracking</span>
+                            <span class="gsheet-badge-pill">Live Two-Way Continuous Tracking</span>
                         </h2>
-                        <div style="font-size: 0.85rem; color: #64748b;">
-                            Paste your Google Sheet link. The system inspects columns, reads 11-digit AWBs from <strong>Column H</strong> (along with Customer, Destination, Packages, Weights), and continuously tracks active shipments across 11 global airlines until delivered.
+                        <div class="gsheet-subtitle">
+                            Paste your Google Sheet link. The system inspects columns, reads 11-digit AWBs from <strong>Column H</strong> (along with Customer, Destination, Packages, Weights), and continuously tracks active shipments across 13 global airlines until delivered.
                         </div>
                     </div>
                 </div>
 
                 <!-- Google Sheet URL input & controls -->
-                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end;">
-                    <div style="flex: 1; min-width: 320px;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Google Sheet Link (View / Edit access):</label>
-                        <input type="text" id="gSheetUrlInput" style="width: 100%; padding: 0.65rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 0.9rem;" value="https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/..." />
+                <div class="gsheet-grid-row">
+                    <div class="gsheet-input-wrap">
+                        <label class="gsheet-label">Google Sheet Link (View / Edit access):</label>
+                        <input type="text" id="gSheetUrlInput" class="gsheet-input" value="https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/..." />
                     </div>
-                    <div style="width: 155px;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Target Column:</label>
-                        <select id="gSheetColSelect" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 0.9rem; background: #fff;">
+                    <div style="width: 165px;">
+                        <label class="gsheet-label">Target Column:</label>
+                        <select id="gSheetColSelect" class="gsheet-select">
                             <option value="H" selected>Column H (AWB NO)</option>
                             <option value="A">Column A</option>
                             <option value="B">Column B</option>
@@ -811,69 +1177,69 @@
                             <option value="J">Column J</option>
                         </select>
                     </div>
-                    <div style="width: 175px;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Month / Sheet Tab:</label>
-                        <select id="gSheetTabSelect" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 0.9rem; background: #fff;">
+                    <div style="width: 185px;">
+                        <label class="gsheet-label">Month / Sheet Tab:</label>
+                        <select id="gSheetTabSelect" class="gsheet-select">
                             <option value="NOV-26" selected>NOV-26 (Active Tab)</option>
                             <option value="OCT-26">OCT-26</option>
                             <option value="SEP-26">SEP-26</option>
                         </select>
                     </div>
-                    <div style="width: 140px;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Start Row (e.g. 110):</label>
-                        <input type="number" id="gSheetStartRowInput" value="110" style="width: 100%; padding: 0.65rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 0.95rem; text-align: center;" placeholder="110" title="Start scanning from this row downwards (e.g. 110 for H110 downwards)" />
+                    <div style="width: 145px;">
+                        <label class="gsheet-label">Start Row:</label>
+                        <input type="number" id="gSheetStartRowInput" value="110" class="gsheet-input" style="text-align: center;" placeholder="110" title="Start scanning from this row downwards (e.g. 110 for H110 downwards)" />
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 15px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
-                    <label style="display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; color: #334155; cursor: pointer;">
-                        <input type="checkbox" id="gSheetScanAllTabs" style="cursor: pointer;" />
+                <div style="display: flex; gap: 15px; margin-bottom: 14px; align-items: center; flex-wrap: wrap;">
+                    <label class="gsheet-checkbox-label">
+                        <input type="checkbox" id="gSheetScanAllTabs" />
                         <span>🌐 Auto-Scan All Tabs & Future Month Tabs (detects new month tabs automatically)</span>
                     </label>
                 </div>
 
                 <!-- Quick Sheet Buttons -->
-                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">Quick Targets:</span>
+                <div class="gsheet-targets-bar">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">Quick Targets:</span>
                     <button class="quick-btn" style="border-color: #2563eb; color: #1d4ed8; font-weight: 700; background: #eff6ff;" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', 110)">⭐ User NOV-26 (from H110 - 14 AWBs)</button>
                     <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', null)">📄 Full NOV-26 Tab (86 AWBs)</button>
                     <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1OsdRGPcS2fLa8pI6C8rTh8eOYQMRRzhTVM2pOaN4h9U/edit?usp=sharing', 'NOV-26', 110)">📄 User Sheet 2 (OsdRG...)</button>
                 </div>
 
                 <!-- Control Buttons -->
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn-search" style="background: #0f172a;" id="btnGSheetInspect" onclick="inspectGoogleSheet()">
+                <div class="gsheet-actions-bar">
+                    <button class="btn-search" style="background: #0f172a; min-width: auto; height: 44px; padding: 0.7rem 1.4rem;" id="btnGSheetInspect" onclick="inspectGoogleSheet()">
                         🔍 Inspect Sheet & Preview Cells
                     </button>
-                    <button class="btn-bulk-track" style="background: #16a34a;" id="btnGSheetSync" onclick="runGoogleSheetSync()">
+                    <button class="btn-bulk-track" style="background: #16a34a; padding: 0.7rem 1.4rem;" id="btnGSheetSync" onclick="runGoogleSheetSync()">
                         ⚡ Auto-Track Lifecycle (Sync Active On-The-Way)
                     </button>
-                    <button class="btn-bulk-track" style="background: #2563eb;" onclick="downloadSheetLifecycleExcel()">
+                    <button class="btn-bulk-track" style="background: #2563eb; padding: 0.7rem 1.4rem;" onclick="downloadSheetLifecycleExcel()">
                         📥 Download Multi-Tab Excel (.xlsx)
                     </button>
                 </div>
             </div>
 
             <!-- ================= AUTO-PILOT CONTINUOUS LIFECYCLE TRACKER CARD ================= -->
-            <div class="search-card" style="margin-bottom: 1.5rem; background: #ffffff; border: 1.5px solid #3b82f6; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem; margin-bottom: 1rem;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.6rem;">🤖</span>
+            <div class="autopilot-card">
+                <div class="autopilot-header">
+                    <div class="autopilot-left">
+                        <div class="autopilot-icon-wrap">🤖</div>
                         <div>
-                            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <h3 class="autopilot-title">
                                 <span>Auto-Pilot Continuous Lifecycle Daemon</span>
-                                <span id="autoPilotStatusBadge" class="badge-status bs-skipped" style="font-size: 0.76rem; padding: 3px 10px;">
+                                <span id="autoPilotStatusBadge" class="badge-status bs-skipped" style="font-size: 0.74rem; padding: 3px 10px;">
                                     <span class="status-dot"></span> <span id="autoPilotStatusText">PAUSED / OFF</span>
                                 </span>
                             </h3>
-                            <div style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">
+                            <div class="autopilot-desc">
                                 Automatically tracks new & active shipments from Google Sheet until <strong>DELIVERED</strong>. Once delivered, shipments freeze and never consume quota again.
                             </div>
                         </div>
                     </div>
 
                     <!-- iOS Style Toggle Switch -->
-                    <div style="display: flex; align-items: center; gap: 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 9999px; padding: 6px 14px;">
+                    <div class="autopilot-toggle-pill">
                         <span style="font-size: 0.85rem; font-weight: 700; color: #1e293b;" id="toggleLabelText">Auto-Pilot is OFF</span>
                         <label class="switch">
                             <input type="checkbox" id="autoPilotToggleCheckbox" onchange="handleAutoPilotToggle(this.checked)" />
@@ -883,10 +1249,10 @@
                 </div>
 
                 <!-- Daemon Status & Controls Row -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; align-items: center;">
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
-                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Sync Interval</div>
-                        <select id="autoPilotIntervalSelect" onchange="updateAutoPilotInterval()" style="margin-top: 4px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; background: #fff; width: 100%;">
+                <div class="autopilot-grid">
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Sync Interval</div>
+                        <select id="autoPilotIntervalSelect" onchange="updateAutoPilotInterval()" class="gsheet-select" style="margin-top: 4px; padding: 5px 8px; font-size: 0.84rem;">
                             <option value="15">Every 15 Minutes</option>
                             <option value="30" selected>Every 30 Minutes (Recommended)</option>
                             <option value="60">Every 1 Hour</option>
@@ -895,18 +1261,18 @@
                         </select>
                     </div>
 
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
-                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Next Auto-Run In</div>
-                        <div style="font-size: 1.25rem; font-weight: 800; color: #0284c7; font-family: monospace; margin-top: 3px;" id="autoPilotCountdown">---</div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Next Auto-Run In</div>
+                        <div class="val" style="color: #0284c7;" id="autoPilotCountdown">---</div>
                     </div>
 
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
-                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Cycles Completed</div>
-                        <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-top: 3px;" id="autoPilotCycleCount">0</div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Total Cycles Completed</div>
+                        <div class="val" style="color: #0f172a;" id="autoPilotCycleCount">0</div>
                     </div>
 
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn-inspect-premium" style="flex: 1; padding: 12px; justify-content: center; background: #0f172a; color: #fff; border-color: #0f172a; font-size: 0.85rem;" onclick="triggerAutoPilotRunNow()" title="Trigger a cycle right now">
+                    <div>
+                        <button class="btn-inspect-premium" style="width: 100%; padding: 12px; justify-content: center; background: #0f172a; color: #fff; border-color: #0f172a; font-size: 0.88rem;" onclick="triggerAutoPilotRunNow()" title="Trigger a cycle right now">
                             <span>⚡ Run Cycle Now</span>
                         </button>
                     </div>
@@ -914,7 +1280,7 @@
             </div>
 
             <!-- Sheet Inspection Result Card (Column Mapping & Cells Detected) -->
-            <div id="gSheetInspectCard" style="display: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div id="gSheetInspectCard" class="gsheet-config-card" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                     <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
                         <span>📋 Sheet Column Mapping & Cell Extraction Preview</span>
@@ -923,14 +1289,14 @@
                 </div>
 
                 <!-- Column Mapping Grid -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1rem; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;" id="gSheetColMappingWrap">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1rem; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid var(--border);" id="gSheetColMappingWrap">
                 </div>
 
                 <!-- Preview Table (Cells H19, H20, etc.) -->
-                <div style="max-height: 260px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
-                    <table class="bulk-table" style="font-size: 0.85rem;">
+                <div class="bulk-table-wrap" style="max-height: 280px;">
+                    <table class="bulk-table">
                         <thead>
-                            <tr style="background: #0f172a; color: #fff;">
+                            <tr>
                                 <th style="width: 50px; text-align: center;">Row</th>
                                 <th style="width: 75px; text-align: center;">Cell</th>
                                 <th style="width: 150px;">AWB Number</th>
@@ -948,40 +1314,62 @@
             </div>
 
             <!-- Lifecycle KPI Counters -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 1.5rem;">
-                <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-                    <div style="font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Sheet AWBs</div>
-                    <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; margin-top: 4px;" id="kpiSheetTotal">0</div>
-                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Extracted from Column H</div>
+            <div class="kpi-row" style="margin-bottom: 1.5rem;">
+                <div class="kpi-card kpi-total">
+                    <div class="m-lbl">Total Sheet AWBs</div>
+                    <div class="m-val" id="kpiSheetTotal">0</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 3px; font-weight: 500;">Extracted from Column H</div>
                 </div>
-                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px;">
-                    <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase;">🚚 On The Way (Active)</div>
-                    <div style="font-size: 1.7rem; font-weight: 800; color: #1d4ed8; margin-top: 4px;" id="kpiSheetActive">0</div>
-                    <div style="font-size: 0.75rem; color: #3b82f6; margin-top: 2px;">In-Transit, Departed, Booked</div>
+                <div class="kpi-card kpi-transit">
+                    <div class="m-lbl">🚚 On The Way (Active)</div>
+                    <div class="m-val" id="kpiSheetActive">0</div>
+                    <div style="font-size: 0.72rem; color: #3b82f6; margin-top: 3px; font-weight: 500;">In-Transit, Departed, Booked</div>
                 </div>
-                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px;">
-                    <div style="font-size: 0.8rem; font-weight: 700; color: #15803d; text-transform: uppercase;">✅ Delivered Archive</div>
-                    <div style="font-size: 1.7rem; font-weight: 800; color: #15803d; margin-top: 4px;" id="kpiSheetDelivered">0</div>
-                    <div style="font-size: 0.75rem; color: #22c55e; margin-top: 2px;">Completed POD (Auto-frozen)</div>
+                <div class="kpi-card kpi-success">
+                    <div class="m-lbl">✅ Delivered Archive</div>
+                    <div class="m-val" id="kpiSheetDelivered">0</div>
+                    <div style="font-size: 0.72rem; color: #16a34a; margin-top: 3px; font-weight: 500;">Completed POD (Auto-frozen)</div>
                 </div>
-                <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px;">
-                    <div style="font-size: 0.8rem; font-weight: 700; color: #b45309; text-transform: uppercase;">⚡ Unreachable / Action</div>
-                    <div style="font-size: 1.7rem; font-weight: 800; color: #b45309; margin-top: 4px;" id="kpiSheetUnreachable">0</div>
-                    <div style="font-size: 0.75rem; color: #d97706; margin-top: 2px;">Bot-check or pending sync</div>
+                <div class="kpi-card kpi-unreachable">
+                    <div class="m-lbl">⚡ Unreachable / Action</div>
+                    <div class="m-val" id="kpiSheetUnreachable">0</div>
+                    <div style="font-size: 0.72rem; color: #d97706; margin-top: 3px; font-weight: 500;">Bot-check or pending sync</div>
                 </div>
             </div>
 
-            <!-- Lifecycle Filter Tabs & Table -->
-            <div class="search-card" style="padding: 1rem 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
-                    <div style="display: flex; gap: 8px;" id="sheetLifecyclePills">
-                        <button class="pill-filter active" id="pillSheetAllBtn" onclick="setSheetLifecycleFilter('all')">📋 All Synchronized (<span id="pillSheetAllCount">0</span>)</button>
-                        <button class="pill-filter" id="pillSheetActiveBtn" style="border-color: #3b82f6; color: #1d4ed8;" onclick="setSheetLifecycleFilter('active')">🚚 On The Way / Active (<span id="pillSheetActiveCount">0</span>)</button>
-                        <button class="pill-filter" id="pillSheetDeliveredBtn" style="border-color: #22c55e; color: #15803d;" onclick="setSheetLifecycleFilter('delivered')">✅ Delivered Archive (<span id="pillSheetDeliveredCount">0</span>)</button>
+            <!-- Lifecycle Filter Tabs & Table Card -->
+            <div class="bulk-results-card" style="display: block; margin-bottom: 2rem;">
+                <div class="bulk-toolbar">
+                    <div class="filter-group">
+                        <div class="search-input-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="sheetSearchInput" class="filter-input" placeholder="Filter by customer, AWB, destination, carrier..." oninput="filterSheetTable()" />
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="sheetSearchInput" placeholder="Filter by customer, AWB, destination..." oninput="filterSheetTable()" style="padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 240px;" />
+                    <div class="bulk-toolbar-right">
+                        <div class="export-actions">
+                            <button class="btn-export-excel" onclick="downloadSheetLifecycleExcel()" title="Download Full Excel (.xlsx)">
+                                <span>📊 Download Excel (.xlsx)</span>
+                            </button>
+                        </div>
                     </div>
+                </div>
+
+                <div class="quick-status-pills" id="sheetLifecyclePills">
+                    <button class="pill-filter active" id="pillSheetAllBtn" onclick="setSheetLifecycleFilter('all')">
+                        <span>All Synchronized</span>
+                        <span class="cnt" id="pillSheetAllCount">0</span>
+                    </button>
+                    <button class="pill-filter" id="pillSheetActiveBtn" onclick="setSheetLifecycleFilter('active')">
+                        <span class="status-dot" style="background:#3b82f6;"></span>
+                        <span>On The Way / Active</span>
+                        <span class="cnt" id="pillSheetActiveCount">0</span>
+                    </button>
+                    <button class="pill-filter" id="pillSheetDeliveredBtn" onclick="setSheetLifecycleFilter('delivered')">
+                        <span class="status-dot" style="background:#10b981;"></span>
+                        <span>Delivered Archive</span>
+                        <span class="cnt" id="pillSheetDeliveredCount">0</span>
+                    </button>
                 </div>
 
                 <!-- Table -->
@@ -1933,9 +2321,151 @@
         });
 
         // Single Tracker JS logic
+        let trackingInterval = null;
+        let trackingStartTime = 0;
+
+        function startTrackingAnimation(awb, carrier) {
+            const btn = document.getElementById('trackBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('btn-loading');
+                const def = btn.querySelector('.btn-content-default');
+                const ldg = btn.querySelector('.btn-content-loading');
+                if (def) def.style.display = 'none';
+                if (ldg) ldg.style.display = 'inline-flex';
+            }
+
+            // Disable search input and quick samples to prevent duplicate overlapping requests
+            const inputEl = document.getElementById('awbInput');
+            const selectEl = document.getElementById('carrierSelect');
+            if (inputEl) inputEl.disabled = true;
+            if (selectEl) selectEl.disabled = true;
+            document.querySelectorAll('.quick-btn').forEach(b => b.disabled = true);
+
+            // Show and initialize modern radar loader
+            const loader = document.getElementById('loader');
+            if (loader) loader.style.display = 'block';
+
+            const timerEl = document.getElementById('loaderTimer');
+            const stepEl = document.getElementById('loaderDynamicStep');
+            const barEl = document.getElementById('loaderProgressBar');
+
+            trackingStartTime = Date.now();
+            if (timerEl) timerEl.innerText = '⏱ 00:00s';
+            if (barEl) barEl.style.width = '14%';
+
+            const cName = carrier && carrier !== 'auto' ? carrier.toUpperCase() : 'AIRLINE';
+            const trackingStages = [
+                `Resolving IATA prefix & validating checksum for ${awb}...`,
+                `Connecting to ${cName} cargo mainframe & Track-Trace network...`,
+                `Solving carrier bot-protection & establishing verified session...`,
+                `Retrieving live flight manifest, piece count, and weight telemetry...`,
+                `Compiling chronological IATA milestone events & route segments...`,
+                `Finalizing verified shipment telemetry...`
+            ];
+
+            if (stepEl) stepEl.innerText = trackingStages[0];
+
+            if (trackingInterval) clearInterval(trackingInterval);
+            trackingInterval = setInterval(() => {
+                const elapsedSec = Math.floor((Date.now() - trackingStartTime) / 1000);
+                const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+                const secs = String(elapsedSec % 60).padStart(2, '0');
+                if (timerEl) timerEl.innerText = `⏱ ${mins}:${secs}s`;
+
+                if (barEl && stepEl) {
+                    if (elapsedSec < 3) {
+                        stepEl.innerText = trackingStages[0];
+                        barEl.style.width = '20%';
+                    } else if (elapsedSec < 7) {
+                        stepEl.innerText = trackingStages[1];
+                        barEl.style.width = '42%';
+                    } else if (elapsedSec < 13) {
+                        stepEl.innerText = trackingStages[2];
+                        barEl.style.width = '64%';
+                    } else if (elapsedSec < 19) {
+                        stepEl.innerText = trackingStages[3];
+                        barEl.style.width = '82%';
+                    } else {
+                        stepEl.innerText = trackingStages[4];
+                        barEl.style.width = '94%';
+                    }
+                }
+            }, 300);
+        }
+
+        function stopTrackingAnimation() {
+            if (trackingInterval) {
+                clearInterval(trackingInterval);
+                trackingInterval = null;
+            }
+
+            const btn = document.getElementById('trackBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+                const def = btn.querySelector('.btn-content-default');
+                const ldg = btn.querySelector('.btn-content-loading');
+                if (def) def.style.display = 'inline-flex';
+                if (ldg) ldg.style.display = 'none';
+            }
+
+            const inputEl = document.getElementById('awbInput');
+            const selectEl = document.getElementById('carrierSelect');
+            if (inputEl) inputEl.disabled = false;
+            if (selectEl) selectEl.disabled = false;
+            document.querySelectorAll('.quick-btn').forEach(b => b.disabled = false);
+
+            const loader = document.getElementById('loader');
+            if (loader) loader.style.display = 'none';
+        }
+
+        function copyCurrentAwb() {
+            const awbText = document.getElementById('awbDisplay').innerText.trim();
+            if (!awbText) return;
+            navigator.clipboard.writeText(awbText).then(() => {
+                const btn = document.getElementById('btnCopyAwb');
+                if (btn) {
+                    const orig = btn.innerHTML;
+                    btn.innerHTML = '✔ Copied!';
+                    btn.style.color = '#16a34a';
+                    setTimeout(() => {
+                        btn.innerHTML = orig;
+                        btn.style.color = '';
+                    }, 2000);
+                }
+            });
+        }
+
+        function handleAwbKeyDown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                trackAWB();
+            }
+            updateClearButton();
+        }
+
+        function updateClearButton() {
+            const input = document.getElementById('awbInput');
+            const clearBtn = document.getElementById('btnClearInput');
+            if (clearBtn && input) {
+                clearBtn.style.display = input.value.trim().length > 0 ? 'block' : 'none';
+            }
+        }
+
+        function clearAwbInput() {
+            const input = document.getElementById('awbInput');
+            if (input) {
+                input.value = '';
+                input.focus();
+                updateClearButton();
+            }
+        }
+
         function setAwb(awb, carrier) {
             document.getElementById('awbInput').value = awb;
             document.getElementById('carrierSelect').value = carrier;
+            updateClearButton();
             trackAWB();
         }
 
@@ -1958,14 +2488,13 @@
             }
 
             const errorBox = document.getElementById('errorBox');
-            const loader = document.getElementById('loader');
             const resultCard = document.getElementById('resultCard');
             const stationWrap = document.getElementById('stationCardsWrap');
 
             errorBox.style.display = 'none';
             resultCard.style.display = 'none';
             stationWrap.style.display = 'none';
-            loader.style.display = 'block';
+            startTrackingAnimation(awbRaw, carrier);
 
             logTerminal(`Initiating single tracking for AWB: ${awbRaw} (Carrier: ${carrier})...`, 'info');
 
@@ -2593,12 +3122,12 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     (data.flights || []).forEach(fl => {
                         fBody.innerHTML += `
                             <tr>
-                                <td><strong style="color: #b45309;">${fl.flight_no}</strong></td>
-                                <td>${fl.segment}</td>
-                                <td>${fl.departure_time || fl.flight_date || 'N/A'}</td>
-                                <td>${fl.arrival_time || 'N/A'}</td>
-                                <td>${fl.pieces || data.overview.pieces || '---'} pcs / ${fl.weight || data.overview.gross_weight || '---'}</td>
-                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e;">${fl.status || 'Confirmed'}</span></td>
+                                <td><span class="fl-chip" style="background:#fef3c7; color:#92400e; border-color:#fde68a;">${fl.flight_no}</span></td>
+                                <td><div class="route-pill-box"><span class="apt-code">${fl.segment}</span></div></td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${fl.departure_time || fl.flight_date || 'N/A'}</td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${fl.arrival_time || 'N/A'}</td>
+                                <td><span class="pw-badge"><strong>${fl.pieces || data.overview.pieces || '---'}</strong> pcs / ${fl.weight || data.overview.gross_weight || '---'}</span></td>
+                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e; border-color:#fde68a;">${fl.status || 'Confirmed'}</span></td>
                             </tr>
                         `;
                     });
@@ -2607,15 +3136,15 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     const hBody = document.getElementById('historyBody');
                     hBody.innerHTML = '';
                     (data.milestones || []).forEach((m, idx) => {
-                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Historical</span>';
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b; font-size:0.8rem;">Historical</span>';
                         const pcsWt = [m.pieces ? `${m.pieces} pcs` : '', m.weight ? `${m.weight}` : ''].filter(Boolean).join(' / ') || '---';
                         hBody.innerHTML += `
                             <tr>
-                                <td>${m.date} ${m.time}</td>
-                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e;">${m.event_code || 'EVENT'}</span></td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${m.date} ${m.time}</td>
+                                <td><span class="badge-ev" style="background:#fef3c7; color:#92400e; border-color:#fde68a;">${m.event_code || 'EVENT'}</span></td>
                                 <td>${m.details || m.status}</td>
-                                <td><strong>${m.station || '---'}</strong></td>
-                                <td>${pcsWt}</td>
+                                <td><span class="apt-code" style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">${m.station || '---'}</span></td>
+                                <td><span class="pw-badge">${pcsWt}</span></td>
                                 <td>${badge}</td>
                             </tr>
                         `;
@@ -2648,12 +3177,12 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     (data.flights || []).forEach(fl => {
                         fBody.innerHTML += `
                             <tr>
-                                <td><strong style="color: #006c35;">${fl.flight_no}</strong></td>
-                                <td>${fl.segment}</td>
-                                <td>${fl.departure_time || fl.flight_date || 'N/A'}</td>
-                                <td>${fl.arrival_time || 'N/A'}</td>
-                                <td>${fl.pieces || data.overview.pieces || '---'} pcs / ${fl.weight || data.overview.gross_weight || '---'}</td>
-                                <td><span class="badge-ev" style="background:#dcfce7; color:#15803d;">${fl.status || 'Confirmed'}</span></td>
+                                <td><span class="fl-chip" style="background:#f0fdf4; color:#166534; border-color:#bbf7d0;">${fl.flight_no}</span></td>
+                                <td><div class="route-pill-box"><span class="apt-code">${fl.segment}</span></div></td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${fl.departure_time || fl.flight_date || 'N/A'}</td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${fl.arrival_time || 'N/A'}</td>
+                                <td><span class="pw-badge"><strong>${fl.pieces || data.overview.pieces || '---'}</strong> pcs / ${fl.weight || data.overview.gross_weight || '---'}</span></td>
+                                <td><span class="badge-ev" style="background:#dcfce7; color:#15803d; border-color:#bbf7d0;">${fl.status || 'Confirmed'}</span></td>
                             </tr>
                         `;
                     });
@@ -2662,15 +3191,15 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     const hBody = document.getElementById('historyBody');
                     hBody.innerHTML = '';
                     (data.milestones || []).forEach((m, idx) => {
-                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b;">Completed</span>';
+                        const badge = m.is_latest ? '<span class="badge-latest">LATEST</span>' : '<span style="color: #64748b; font-size:0.8rem;">Completed</span>';
                         const pcsWt = [m.pieces ? `${m.pieces} pcs` : '', m.weight ? `${m.weight}` : ''].filter(Boolean).join(' / ') || '---';
                         hBody.innerHTML += `
                             <tr>
-                                <td>${m.date} ${m.time}</td>
-                                <td><span class="badge-ev" style="background:#dcfce7; color:#15803d;">${m.event_code || 'EVENT'}</span></td>
+                                <td style="font-family:'JetBrains Mono',monospace; font-size:0.84rem;">${m.date} ${m.time}</td>
+                                <td><span class="badge-ev" style="background:#dcfce7; color:#15803d; border-color:#bbf7d0;">${m.event_code || 'EVENT'}</span></td>
                                 <td>${m.details || m.status}</td>
-                                <td><strong>${m.station || '---'}</strong></td>
-                                <td>${pcsWt}</td>
+                                <td><span class="apt-code" style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">${m.station || '---'}</span></td>
+                                <td><span class="pw-badge">${pcsWt}</span></td>
                                 <td>${badge}</td>
                             </tr>
                         `;
@@ -2728,7 +3257,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 errorBox.innerText = err.message;
                 errorBox.style.display = 'block';
             } finally {
-                loader.style.display = 'none';
+                stopTrackingAnimation();
             }
         }
 
@@ -2748,8 +3277,8 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            trackAWB();
-            // Fetch initial master ledger count
+            updateClearButton();
+            // Fetch initial master ledger count without firing expensive tracking API
             fetch('/api/v1/ledger/stats').then(r => r.json()).then(data => {
                 const navBadge = document.getElementById('navLedgerBadge');
                 if (navBadge) navBadge.innerText = data.total_records ?? 0;
@@ -2853,26 +3382,26 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 if (mapWrap && data.column_mapping) {
                     const cm = data.column_mapping;
                     mapWrap.innerHTML = `
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">AWB No:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.awb || 'Col ' + (cm.awb_col || 'H')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">AWB No:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.awb || 'Col ' + (cm.awb_col || 'H')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">Customer:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.customer || 'Col ' + (cm.customer_col || 'C')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">Customer:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.customer || 'Col ' + (cm.customer_col || 'C')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">Destination:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.dest || 'Col ' + (cm.destination_col || 'F')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">Destination:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.dest || 'Col ' + (cm.destination_col || 'F')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">IATA Agent:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.iata || 'Col ' + (cm.iata_col || 'G')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">IATA Agent:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.iata || 'Col ' + (cm.iata_col || 'G')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">Packages:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.pkg || 'Col ' + (cm.package_col || 'J')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">Packages:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.pkg || 'Col ' + (cm.package_col || 'J')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">Gross Wt:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.gr_wt || 'Col ' + (cm.gross_wt_col || 'K')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">Gross Wt:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.gr_wt || 'Col ' + (cm.gross_wt_col || 'K')}</strong>
                         </div>
-                        <div style="font-size: 0.8rem; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
-                            <span style="color:#64748b; font-weight:600;">Chargeable Wt:</span> <strong style="color:#0f172a; font-family:monospace;">${cm.ch_wt || 'Col ' + (cm.chargeable_wt_col || 'L')}</strong>
+                        <div style="font-size: 0.8rem; background: #fff; padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="color:#64748b; font-weight:700; text-transform:uppercase; font-size:0.7rem;">Chargeable Wt:</span> <strong style="color:#0f172a; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${cm.ch_wt || 'Col ' + (cm.chargeable_wt_col || 'L')}</strong>
                         </div>
                     `;
                 }
@@ -2887,15 +3416,20 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                             const pcs = item.packages !== undefined ? item.packages : (item.pieces || '---');
                             const wt = item.gross_weight !== undefined ? item.gross_weight : (item.weight || '---');
                             tr.innerHTML = `
-                                <td style="text-align: center; color: #64748b; font-weight:600;">${item.row}</td>
-                                <td style="text-align: center; font-family: monospace; font-weight: 700; color: #0284c7; background: #f0f9ff;">${item.cell}</td>
-                                <td><strong style="font-family: monospace; font-size: 0.92rem; color: #0f172a;">${item.awb}</strong></td>
+                                <td style="text-align: center; color: #64748b; font-weight:600; font-family:'JetBrains Mono',monospace;">${item.row}</td>
+                                <td style="text-align: center;"><span style="font-family:'JetBrains Mono',monospace; font-weight: 700; color: #0284c7; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2px 7px; border-radius: 5px;">${item.cell}</span></td>
+                                <td>
+                                    <div class="cell-awb-wrap">
+                                        <span class="awb-code">${item.awb}</span>
+                                        <button class="btn-copy-mini" onclick="copyAwb('${item.awb}')" title="Copy AWB">📋</button>
+                                    </div>
+                                </td>
                                 <td><span style="font-weight:600; color: #334155;">${item.carrier}</span></td>
                                 <td><strong style="color: #1e293b;">${item.customer || '---'}</strong></td>
-                                <td style="text-align: center;"><span style="background: #e2e8f0; font-weight:700; font-size:0.75rem; padding: 2px 6px; border-radius:4px;">${item.destination || '---'}</span></td>
-                                <td><span style="color: #475569; font-size: 0.8rem;">${item.iata || '---'}</span></td>
-                                <td style="text-align: center; font-weight: 600;">${pcs}</td>
-                                <td style="text-align: right; font-weight: 700; color: #0f172a;">${wt ? wt + ' kg' : '---'}</td>
+                                <td style="text-align: center;"><span style="background: #e2e8f0; font-weight:700; font-size:0.75rem; padding: 2px 7px; border-radius:4px; font-family:'JetBrains Mono',monospace;">${item.destination || '---'}</span></td>
+                                <td><span style="color: #475569; font-size: 0.8rem; font-family:'JetBrains Mono',monospace;">${item.iata || '---'}</span></td>
+                                <td style="text-align: center;"><span class="pw-badge"><strong>${pcs}</strong> pcs</span></td>
+                                <td style="text-align: right;"><span class="pw-badge"><strong>${wt}</strong> kg</span></td>
                             `;
                             tbody.appendChild(tr);
                         });
@@ -3243,6 +3777,12 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                         countdown.innerText = '---';
                     }
                 }
+
+                // If Auto-Pilot is stopped, stop the interval polling to avoid unnecessary requests on server
+                if (!isRunning && autoPilotPollingTimer) {
+                    clearInterval(autoPilotPollingTimer);
+                    autoPilotPollingTimer = null;
+                }
             } catch (err) {
                 console.error('Error fetching Auto-Pilot status:', err);
             }
@@ -3250,11 +3790,11 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
 
         function ensureAutoPilotPolling() {
             if (!autoPilotPollingTimer) {
-                autoPilotPollingTimer = setInterval(fetchAutoPilotStatus, 3000);
+                autoPilotPollingTimer = setInterval(fetchAutoPilotStatus, 4000);
             }
         }
 
-        // Initialize status on load
+        // Initialize status on load (one-time fetch only, no continuous loop if OFF)
         window.addEventListener('DOMContentLoaded', () => {
             fetchAutoPilotStatus();
         });
