@@ -24,11 +24,11 @@ CARRIER_PREFIXES = {
     "098": ("Air India Cargo", "AI"),
     "235": ("Turkish Cargo (TK)", "TK"),
     "607": ("Etihad Cargo (EY)", "EY"),
+    "065": ("Saudia Cargo (SV)", "SV"),
 }
 
 # Extended registry of global IATA airline prefixes for recognition and polite skipping
 KNOWN_GLOBAL_IATA_PREFIXES = {
-    "065": ("Saudi Arabian Airlines (Saudia Cargo)", "SV"),
     "615": ("DHL Aviation / European Air Transport", "QY"),
     "014": ("Air Canada Cargo", "AC"),
     "016": ("United Airlines Cargo", "UA"),

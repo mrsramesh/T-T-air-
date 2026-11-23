@@ -32,6 +32,7 @@ from neos_tracker.client import NeosCargoClient, NeosShipmentNotFoundError, Neos
 from indigo_tracker.client import IndigoCargoClient, IndigoShipmentNotFoundError, IndigoTrackingError
 from turkish_tracker.client import TurkishCargoClient, TurkishShipmentNotFoundError, TurkishTrackingError
 from etihad_tracker.client import EtihadCargoClient, EtihadShipmentNotFoundError, EtihadTrackingError
+from saudia_tracker.client import SaudiaCargoClient, SaudiaShipmentNotFoundError, SaudiaTrackingError
 from bulk_tracker import (
     BulkCargoTracker,
     AWBExtractor,
@@ -78,6 +79,7 @@ neos_client = NeosCargoClient()
 indigo_client = IndigoCargoClient()
 turkish_client = TurkishCargoClient()
 etihad_client = EtihadCargoClient()
+saudia_client = SaudiaCargoClient()
 bulk_tracker = BulkCargoTracker(max_global_workers=8)
 
 
@@ -122,6 +124,8 @@ def detect_carrier(awb: str) -> str:
         return "turkish"
     if cleaned.startswith("607"):
         return "etihad"
+    if cleaned.startswith("065"):
+        return "saudia"
     if len(cleaned) == 8:
         return "kuwait"
     return "airindia"
@@ -145,6 +149,7 @@ def health_check():
             "IndiGo CarGo (6E) (312)",
             "Turkish Cargo (TK) (235)",
             "Etihad Cargo (EY) (607)",
+            "Saudia Cargo (SV) (065)",
         ],
     }
 
@@ -158,7 +163,7 @@ def track_shipment(
     Track a shipment by AWB number.
     Auto-detects IndiGo CarGo (312), Neos Air Cargo (703), EgyptAir Cargo (077), Qatar Airways (157), Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
     """
-    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels", "turkish", "tk", "turkishcargo", "etihad", "ey", "etihadcargo") else detect_carrier(awb)
+    target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels", "turkish", "tk", "turkishcargo", "etihad", "ey", "etihadcargo", "saudia", "sv", "saudiacargo") else detect_carrier(awb)
 
     # Automatically record & update in Master Ledger
     try:
@@ -202,12 +207,15 @@ def track_shipment(
         elif target_carrier in ("etihad", "ey", "etihadcargo"):
             res = etihad_client.track(awb)
             return {"carrier": "Etihad Cargo (EY)", "carrier_code": "607", "data": res.model_dump() if hasattr(res, "model_dump") else res.dict()}
+        elif target_carrier in ("saudia", "sv", "saudiacargo"):
+            res = saudia_client.track(awb)
+            return {"carrier": "Saudia Cargo (SV)", "carrier_code": "065", "data": res.model_dump() if hasattr(res, "model_dump") else res.dict()}
         else:
             res = ai_client.track(awb)
             return {"carrier": "Air India Cargo", "carrier_code": "098", "data": res.model_dump() if hasattr(res, "model_dump") else res.dict()}
-    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, QatarShipmentNotFoundError, CargoFlashShipmentNotFoundError, NeosShipmentNotFoundError, IndigoShipmentNotFoundError, TurkishShipmentNotFoundError, EtihadShipmentNotFoundError, ValueError) as e:
+    except (AWBNotFoundException, EmiratesShipmentNotFoundError, KuwaitShipmentNotFoundError, ParcelsShipmentNotFoundError, VirginShipmentNotFoundError, QatarShipmentNotFoundError, CargoFlashShipmentNotFoundError, NeosShipmentNotFoundError, IndigoShipmentNotFoundError, TurkishShipmentNotFoundError, EtihadShipmentNotFoundError, SaudiaShipmentNotFoundError, ValueError) as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError, QatarTrackingError, CargoFlashTrackingError, NeosTrackingError, IndigoTrackingError, TurkishTrackingError, EtihadTrackingError) as e:
+    except (AirIndiaTrackerException, EmiratesTrackingError, KuwaitTrackingError, ParcelsTrackingError, VirginTrackingError, QatarTrackingError, CargoFlashTrackingError, NeosTrackingError, IndigoTrackingError, TurkishTrackingError, EtihadTrackingError, SaudiaTrackingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal tracking error: {e}")
@@ -218,7 +226,7 @@ def track_batch(payload: BatchTrackRequest):
     """Track multiple AWBs concurrently across multiple carriers."""
     results = {}
     for awb in payload.awbs:
-        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels", "turkish", "tk", "turkishcargo", "etihad", "ey", "etihadcargo") else detect_carrier(awb)
+        target = payload.carrier if payload.carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels", "turkish", "tk", "turkishcargo", "etihad", "ey", "etihadcargo", "saudia", "sv", "saudiacargo") else detect_carrier(awb)
         try:
             if target in ("indigo", "6e", "indigocargo"):
                 results[awb] = {"carrier": "IndiGo CarGo (6E)", "status": "success", "data": indigo_client.track(awb).model_dump() if hasattr(indigo_client.track(awb), "model_dump") else indigo_client.track(awb).dict()}
@@ -242,6 +250,8 @@ def track_batch(payload: BatchTrackRequest):
                 results[awb] = {"carrier": "Turkish Cargo (TK)", "status": "success", "data": turkish_client.track(awb).model_dump() if hasattr(turkish_client.track(awb), "model_dump") else turkish_client.track(awb).dict()}
             elif target in ("etihad", "ey", "etihadcargo"):
                 results[awb] = {"carrier": "Etihad Cargo (EY)", "status": "success", "data": etihad_client.track(awb).model_dump() if hasattr(etihad_client.track(awb), "model_dump") else etihad_client.track(awb).dict()}
+            elif target in ("saudia", "sv", "saudiacargo"):
+                results[awb] = {"carrier": "Saudia Cargo (SV)", "status": "success", "data": saudia_client.track(awb).model_dump() if hasattr(saudia_client.track(awb), "model_dump") else saudia_client.track(awb).dict()}
             else:
                 results[awb] = {"carrier": "Air India Cargo", "status": "success", "data": ai_client.track(awb).model_dump() if hasattr(ai_client.track(awb), "model_dump") else ai_client.track(awb).dict()}
         except Exception as e:

@@ -23,6 +23,7 @@ from qatar_tracker.client import QatarCargoClient, QatarShipmentNotFoundError
 from virgin_tracker.client import VirginCargoClient, VirginShipmentNotFoundError
 from turkish_tracker.client import TurkishCargoClient, TurkishShipmentNotFoundError, TurkishTrackingError
 from etihad_tracker.client import EtihadCargoClient, EtihadShipmentNotFoundError, EtihadTrackingError
+from saudia_tracker.client import SaudiaCargoClient, SaudiaShipmentNotFoundError, SaudiaTrackingError
 
 from bulk_tracker.extractor import AWBExtractor, CARRIER_PREFIXES, KNOWN_GLOBAL_IATA_PREFIXES
 from bulk_tracker.models import BulkTrackingSummary, UnifiedTrackingRecord
@@ -58,6 +59,7 @@ class BulkCargoTracker:
             "098": AirIndiaCargoClient(),
             "235": TurkishCargoClient(),
             "607": EtihadCargoClient(),
+            "065": SaudiaCargoClient(),
         }
 
         # Domain level locks to prevent hammering any single airline portal
@@ -180,6 +182,10 @@ class BulkCargoTracker:
                     res = self.clients["607"].track(raw_awb)
                     return CarrierDataNormalizer.normalize_etihad(res, raw_awb, time.time() - t0)
 
+                elif prefix == "065":
+                    res = self.clients["065"].track(raw_awb)
+                    return CarrierDataNormalizer.normalize_saudia(res, raw_awb, time.time() - t0)
+
                 else:
                     return CarrierDataNormalizer.create_error_record(
                         raw_awb, f"Carrier prefix {prefix} not routed", time.time() - t0, prefix=prefix, carrier_name=carrier_name, carrier_code=carrier_code
@@ -196,6 +202,7 @@ class BulkCargoTracker:
                 EmiratesShipmentNotFoundError,
                 TurkishShipmentNotFoundError,
                 EtihadShipmentNotFoundError,
+                SaudiaShipmentNotFoundError,
             ) as e:
                 # Do not retry definitive 404 Not Found responses
                 return CarrierDataNormalizer.create_error_record(
