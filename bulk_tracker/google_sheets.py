@@ -26,6 +26,8 @@ from bulk_tracker.models import UnifiedTrackingRecord
 from bulk_tracker.engine import BulkCargoTracker
 from bulk_tracker.ledger import MasterLedgerManager, DEFAULT_DB_PATH
 from bulk_tracker.extractor import KNOWN_GLOBAL_IATA_PREFIXES, CARRIER_PREFIXES
+from bulk_tracker.proxy_pool import proxy_pool
+from bulk_tracker.stealth import StealthEngine
 
 logger = logging.getLogger("bulk_tracker.google_sheets")
 
@@ -50,10 +52,12 @@ class GoogleSheetsTracker:
     Automated Google Sheets ingestion and shipment lifecycle engine.
     """
 
-    def __init__(self, db_path: Optional[Path] = None, timeout_sec: int = 20):
+    def __init__(self, db_path: Optional[Path] = None, timeout_sec: int = 25):
         self.db_path = db_path or DEFAULT_DB_PATH
         self.ledger = MasterLedgerManager(self.db_path)
         self.timeout_sec = timeout_sec
+        self._cache: Dict[str, Tuple[float, bytes]] = {}
+        self.cache_ttl_sec: int = 120  # 2 minute cache to prevent Google rate limits
 
     @staticmethod
     def parse_sheet_id(url_or_id: str) -> str:
@@ -72,41 +76,74 @@ class GoogleSheetsTracker:
             return clean
         raise ValueError(f"Invalid Google Sheet URL or ID: '{url_or_id}'. Expected standard Google Docs spreadsheet link.")
 
-    def fetch_workbook(self, sheet_id: str) -> openpyxl.Workbook:
+    def fetch_workbook(self, sheet_id: str, bypass_cache: bool = False) -> openpyxl.Workbook:
         """
         Downloads Google Sheet via XLSX export and loads into openpyxl Workbook.
+        Features anti-429 exponential backoff, rotating User-Agent, in-memory caching,
+        and proxy support.
         """
-        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
-        req = urllib.request.Request(
-            export_url,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                ),
-                "Accept": "*/*",
-            },
-        )
+        now = time.time()
+        if not bypass_cache and sheet_id in self._cache:
+            ts, cached_bytes = self._cache[sheet_id]
+            if now - ts < self.cache_ttl_sec:
+                logger.debug(f"[GoogleSheets] Returning cached workbook for {sheet_id} ({int(now - ts)}s old)")
+                return openpyxl.load_workbook(io.BytesIO(cached_bytes), data_only=True)
 
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as response:
-                content = response.read()
-                if not content or len(content) < 500:
-                    raise GoogleSheetError("Downloaded spreadsheet payload is empty or corrupted.")
-                return openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-        except urllib.error.HTTPError as he:
-            if he.code in (401, 403):
-                raise GoogleSheetAccessError(
-                    f"Google Sheet access is restricted (HTTP {he.code} Unauthorized). "
-                    "Please open the sheet in Google Drive -> click 'Share' at the top right -> "
-                    "under 'General access', change from 'Restricted' to 'Anyone with the link can view' (or Editor), then retry."
-                )
-            elif he.code == 404:
-                raise GoogleSheetNotFoundError(f"Google Sheet not found (HTTP 404). Please verify the spreadsheet ID: '{sheet_id}'.")
-            else:
-                raise GoogleSheetError(f"Failed to fetch Google Sheet: HTTP {he.code} {he.reason}")
-        except Exception as e:
-            raise GoogleSheetError(f"Network error accessing Google Sheet: {e}")
+        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+        headers = StealthEngine.get_stealth_headers(referer="https://docs.google.com/")
+
+        max_attempts = 3
+        last_error = None
+
+        for attempt in range(max_attempts):
+            try:
+                proxy_str = proxy_pool.get_proxy()
+                opener = urllib.request.build_opener()
+                if proxy_str:
+                    proxy_handler = urllib.request.ProxyHandler({"http": proxy_str, "https": proxy_str})
+                    opener = urllib.request.build_opener(proxy_handler)
+
+                req = urllib.request.Request(export_url, headers=headers)
+                with opener.open(req, timeout=self.timeout_sec) as response:
+                    content = response.read()
+                    if not content or len(content) < 500:
+                        raise GoogleSheetError("Downloaded spreadsheet payload is empty or corrupted.")
+
+                    # Cache successful download
+                    self._cache[sheet_id] = (time.time(), content)
+                    if proxy_str:
+                        proxy_pool.report_success(proxy_str)
+                    return openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+
+            except urllib.error.HTTPError as he:
+                last_error = he
+                if he.code in (401, 403):
+                    raise GoogleSheetAccessError(
+                        f"Google Sheet access is restricted (HTTP {he.code} Unauthorized). "
+                        "Please open the sheet in Google Drive -> click 'Share' at the top right -> "
+                        "under 'General access', change from 'Restricted' to 'Anyone with the link can view' (or Editor), then retry."
+                    )
+                elif he.code == 404:
+                    raise GoogleSheetNotFoundError(f"Google Sheet not found (HTTP 404). Please verify the spreadsheet ID: '{sheet_id}'.")
+                elif he.code == 429:
+                    wait_time = (2 ** attempt) + 1.0
+                    logger.warning(f"[GoogleSheets] HTTP 429 Rate Limit from Google. Backing off {wait_time}s (attempt {attempt + 1}/{max_attempts})...")
+                    time.sleep(wait_time)
+                else:
+                    logger.warning(f"[GoogleSheets] HTTP Error {he.code}: {he.reason}")
+                    time.sleep(1.0)
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[GoogleSheets] Network error on attempt {attempt + 1}: {e}")
+                time.sleep(1.5)
+
+        # If cache exists (even expired), use it as fallback before crashing
+        if sheet_id in self._cache:
+            logger.info(f"[GoogleSheets] Network failed; falling back to last good cached workbook for {sheet_id}")
+            _, cached_bytes = self._cache[sheet_id]
+            return openpyxl.load_workbook(io.BytesIO(cached_bytes), data_only=True)
+
+        raise GoogleSheetError(f"Failed to fetch Google Sheet after retries: {last_error}")
 
     @staticmethod
     def _col_letter_to_index(col_str: str) -> int:
@@ -410,9 +447,14 @@ class GoogleSheetsTracker:
 
         for item in manifest:
             existing = self.ledger.get_record_by_awb(item["clean_awb"])
-            if existing and existing.get("status") == "DELIVERED" and not recheck_delivered:
+            is_recycled = self.ledger.is_record_stale_or_recycled(
+                existing, max_delivery_age_days=60, current_tab_month=sheet_name
+            )
+            if existing and existing.get("status") == "DELIVERED" and not recheck_delivered and not is_recycled:
                 already_delivered_records.append(existing)
             else:
+                if is_recycled and existing and existing.get("status") == "DELIVERED":
+                    logger.info(f"[Lifecycle] AWB {item['formatted_awb']} was delivered >60 days ago. Treating as recycled serial and re-tracking!")
                 needs_tracking.append(item)
 
         logger.info(f"LifeCycle: {len(already_delivered_records)} already DELIVERED (skipped). {len(needs_tracking)} Active / New to track.")

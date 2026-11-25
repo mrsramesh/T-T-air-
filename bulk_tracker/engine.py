@@ -28,6 +28,7 @@ from saudia_tracker.client import SaudiaCargoClient, SaudiaShipmentNotFoundError
 from bulk_tracker.extractor import AWBExtractor, CARRIER_PREFIXES, KNOWN_GLOBAL_IATA_PREFIXES
 from bulk_tracker.models import BulkTrackingSummary, UnifiedTrackingRecord
 from bulk_tracker.normalizer import CarrierDataNormalizer
+from bulk_tracker.circuit_breaker import circuit_breaker
 
 logger = logging.getLogger("bulk_tracker")
 
@@ -129,62 +130,97 @@ class BulkCargoTracker:
                 status_override="SKIPPED",
             )
 
-        # 2. Query Supported Carrier Portals
+        # 2. Adaptive Circuit Breaker Fallback Check
+        if circuit_breaker.should_use_fallback(prefix):
+            logger.info(f"Carrier {prefix} ({carrier_name}) circuit tripped; routing {raw_awb} to aggregator fallback...")
+            try:
+                res = self.clients["125"].track(raw_awb)
+                return CarrierDataNormalizer.normalize_parcels(res, raw_awb, time.time() - t0)
+            except Exception as fb_err:
+                logger.warning(f"Aggregator fallback for {raw_awb} also failed: {fb_err}")
+
+        # 3. Query Supported Carrier Portals
         for attempt in range(max_retries):
             try:
                 self._polite_domain_delay(prefix)
 
                 if prefix == "312":
                     res = self.clients["312"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_indigo(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_indigo(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "703":
                     res = self.clients["703"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_neos(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_neos(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "077":
                     res = self.clients["077"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_cargoflash(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_cargoflash(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "157":
                     res = self.clients["157"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_qatar(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_qatar(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "932":
                     res = self.clients["932"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_virgin(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_virgin(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "125":
                     res = self.clients["125"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_parcels(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_parcels(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "229":
                     res = self.clients["229"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_kuwait(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_kuwait(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "176":
                     res = self.clients["176"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_emirates(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_emirates(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "020":
                     res = self.clients["020"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_lufthansa(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_lufthansa(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "098":
                     res = self.clients["098"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_airindia(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_airindia(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "235":
                     res = self.clients["235"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_turkish(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_turkish(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "607":
                     res = self.clients["607"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_etihad(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_etihad(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 elif prefix == "065":
                     res = self.clients["065"].track(raw_awb)
-                    return CarrierDataNormalizer.normalize_saudia(res, raw_awb, time.time() - t0)
+                    rec = CarrierDataNormalizer.normalize_saudia(res, raw_awb, time.time() - t0)
+                    circuit_breaker.record_success(prefix)
+                    return rec
 
                 else:
                     return CarrierDataNormalizer.create_error_record(
@@ -210,6 +246,7 @@ class BulkCargoTracker:
                 )
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} tracking {raw_awb} ({carrier_name}) error: {e}")
+                circuit_breaker.record_failure(prefix, str(e))
                 if attempt < max_retries - 1:
                     time.sleep(1.0 * (attempt + 1))
                 else:

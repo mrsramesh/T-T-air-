@@ -12,3 +12,4 @@
 
 
 button ko decable karo taaki pta lagi ke kaam background me chal rha hai 
+Fix Memory Leaks and Concurrency Capping es se problem ?

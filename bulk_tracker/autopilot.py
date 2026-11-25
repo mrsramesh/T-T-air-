@@ -45,6 +45,7 @@ class AutoPilotManager:
             "delivered_skipped": 0,
             "newly_delivered": 0,
             "last_error": None,
+            "is_cycling": False,
         }
 
         self._stop_event = threading.Event()
@@ -91,6 +92,12 @@ class AutoPilotManager:
             self.is_running = True
             self.stats["last_error"] = None
 
+            # Persist state to SQLite so it survives restarts
+            try:
+                self.ledger.save_autopilot_state(is_running=True, config=self.config)
+            except Exception as se:
+                logger.warning(f"[AutoPilot] Could not persist state to DB: {se}")
+
             # Spawn dedicated background worker thread
             self._thread = threading.Thread(
                 target=self._worker_loop,
@@ -123,6 +130,10 @@ class AutoPilotManager:
             self.is_running = False
             self._stop_event.set()
             self.stats["next_run_time"] = None
+            try:
+                self.ledger.save_autopilot_state(is_running=False, config=self.config)
+            except Exception as se:
+                logger.warning(f"[AutoPilot] Could not persist state to DB: {se}")
             logger.info("[AutoPilot] Daemon STOP requested.")
 
         return {
@@ -130,6 +141,21 @@ class AutoPilotManager:
             "message": "Auto-Pilot background lifecycle tracker paused.",
             "status_data": self.get_status(),
         }
+
+    def resume_from_storage(self) -> bool:
+        """
+        Solves Risk #6: Auto-resumes Auto-Pilot if it was running before server restart.
+        """
+        try:
+            saved = self.ledger.load_autopilot_state()
+            if saved and saved.get("is_running"):
+                cfg = saved.get("config") or {}
+                logger.info("[AutoPilot] Found persisted active state in database. Auto-resuming background daemon...")
+                self.start(config_override=cfg)
+                return True
+        except Exception as e:
+            logger.warning(f"[AutoPilot] Could not resume state from database: {e}")
+        return False
 
     def run_now(self) -> Dict[str, Any]:
         """Executes a single tracking cycle immediately in-line."""
@@ -162,6 +188,8 @@ class AutoPilotManager:
         """Runs a complete sync cycle from Google Sheet."""
         t0 = time.time()
         logger.info("[AutoPilot] Executing scheduled lifecycle tracking cycle...")
+        with self._lock:
+            self.stats["is_cycling"] = True
 
         try:
             url = self.config["url"]
@@ -181,14 +209,29 @@ class AutoPilotManager:
                 recheck_delivered=False,
             )
 
+            new_delivered = result.get("delivered_count", 0)
+
             with self._lock:
                 self.stats["total_cycles"] += 1
                 self.stats["last_run_time"] = datetime.datetime.now().isoformat()
                 self.stats["total_scanned"] = result.get("total_sheet_awbs", 0)
                 self.stats["active_tracked"] = result.get("active_tracked_count", 0)
                 self.stats["delivered_skipped"] = result.get("already_delivered_skipped", 0)
-                self.stats["newly_delivered"] = result.get("delivered_count", 0)
+                self.stats["newly_delivered"] = new_delivered
                 self.stats["last_error"] = None
+
+            # Dispatched notification if new shipments delivered
+            if new_delivered > 0:
+                try:
+                    from bulk_tracker.notifier import notifier
+                    notifier.send_alert_async(
+                        "AutoPilot: Shipments Delivered!",
+                        f"Cycle #{self.stats['total_cycles']} delivered {new_delivered} shipments.\n"
+                        f"Active remaining: {self.stats['active_tracked']}",
+                        level="info",
+                    )
+                except Exception:
+                    pass
 
             elapsed = round(time.time() - t0, 2)
             logger.info(
@@ -204,4 +247,12 @@ class AutoPilotManager:
             logger.error(err_msg, exc_info=True)
             with self._lock:
                 self.stats["last_error"] = err_msg
+            try:
+                from bulk_tracker.notifier import notifier
+                notifier.send_alert_async("AutoPilot Error", err_msg, level="error")
+            except Exception:
+                pass
             return {"status": "error", "message": err_msg}
+        finally:
+            with self._lock:
+                self.stats["is_cycling"] = False

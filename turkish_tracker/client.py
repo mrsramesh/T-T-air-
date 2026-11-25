@@ -286,31 +286,14 @@ class TurkishCargoClient:
         logger.info(f"[PRIMARY] Executing Track-Trace engine for Turkish Cargo: {formatted_awb}")
 
         try:
-            with sync_playwright() as p:
-                launch_kwargs: Dict[str, Any] = {
-                    "headless": True,
-                    "args": [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
-                }
-                if self.proxy:
-                    launch_kwargs["proxy"] = {"server": self.proxy}
-
-                browser = p.chromium.launch(**launch_kwargs)
-                context = browser.new_context(
-                    user_agent=DEFAULT_HEADERS["User-Agent"],
-                    viewport={"width": 1440, "height": 900},
-                )
-                page = context.new_page()
-                page.add_init_script(STEALTH_SCRIPT)
-
+            from bulk_tracker.browser_manager import BrowserManager
+            with BrowserManager.launch_stealth_page(
+                headless=True, timeout_ms=self.timeout_sec * 1000, custom_proxy=self.proxy
+            ) as (page, context, browser):
                 try:
                     page.goto(TRACK_TRACE_CARGO_URL, wait_until="domcontentloaded", timeout=self.timeout_sec * 1000)
                 except Exception as ne:
                     logger.warning(f"Track-Trace navigation failed: {ne}")
-                    browser.close()
                     return None
 
                 # Locate input field
@@ -444,44 +427,25 @@ class TurkishCargoClient:
         logger.info(f"[BACKUP] Direct Turkish Cargo portal tracking for: {formatted_awb}")
 
         try:
-            with sync_playwright() as p:
-                launch_kwargs: Dict[str, Any] = {
-                    "headless": True,
-                    "args": [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
-                }
-                if self.proxy:
-                    launch_kwargs["proxy"] = {"server": self.proxy}
-
-                browser = p.chromium.launch(**launch_kwargs)
-                context = browser.new_context(
-                    user_agent=DEFAULT_HEADERS["User-Agent"],
-                    viewport={"width": 1440, "height": 900},
-                )
-                page = context.new_page()
-                page.add_init_script(STEALTH_SCRIPT)
-
+            from bulk_tracker.browser_manager import BrowserManager
+            with BrowserManager.launch_stealth_page(
+                headless=True, timeout_ms=self.timeout_sec * 1000, custom_proxy=self.proxy
+            ) as (page, context, browser):
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_sec * 1000)
                     page.wait_for_timeout(3000)
                 except Exception as ne:
                     logger.warning(f"Direct Turkish Cargo portal navigation failed: {ne}")
-                    browser.close()
                     return None
 
                 # Check if PerimeterX is present
                 challenge = page.locator("text='Press & Hold to confirm you are a human'").first
                 if challenge.is_visible(timeout=2000):
                     logger.warning("PerimeterX challenge active on direct Turkish Cargo portal.")
-                    browser.close()
                     return None
 
                 page_html = page.content()
                 res = self._parse_turkish_html_content(page_html, prefix, serial, formatted_awb)
-                browser.close()
                 return res
         except Exception as e:
             logger.warning(f"Direct Turkish Cargo tracking failed: {e}")

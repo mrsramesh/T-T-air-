@@ -8,9 +8,33 @@ import json
 import sqlite3
 import io
 import csv
+import functools
+import random
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
+
+def sqlite_retry(max_retries: int = 5, initial_delay: float = 0.05):
+    """Decorator to retry SQLite operations when database is locked or busy."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_err = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    if "locked" in str(e).lower() or "busy" in str(e).lower():
+                        last_err = e
+                        time.sleep(delay + random.uniform(0.01, 0.04))
+                        delay *= 1.8
+                    else:
+                        raise e
+            raise last_err
+        return wrapper
+    return decorator
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -58,11 +82,12 @@ class MasterLedgerManager:
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn = sqlite3.connect(str(self.db_path), timeout=60.0)
         conn.row_factory = sqlite3.Row
-        # Enable WAL mode for high concurrency read/write
+        # Enable WAL mode and robust busy timeout for zero locking errors
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=15000;")
         return conn
 
     def _init_db(self):
@@ -94,9 +119,147 @@ class MasterLedgerManager:
                 raw_payload_json TEXT
             );
             """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS autopilot_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_kv_store (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_status ON master_awb_ledger(status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_updated ON master_awb_ledger(last_updated_at);")
             conn.commit()
+
+    @sqlite_retry()
+    def save_autopilot_state(self, is_running: bool, config: Dict[str, Any]):
+        """Persists Auto-Pilot ON/OFF toggle state and configuration to SQLite."""
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO autopilot_state (key, value) VALUES ('is_running', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+                (str(int(bool(is_running))),)
+            )
+            conn.execute(
+                "INSERT INTO autopilot_state (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+                (json.dumps(config),)
+            )
+            conn.commit()
+
+    @sqlite_retry()
+    def load_autopilot_state(self) -> Optional[Dict[str, Any]]:
+        """Loads persisted Auto-Pilot ON/OFF toggle and configuration from SQLite."""
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT key, value FROM autopilot_state;")
+            data = {row["key"]: row["value"] for row in cur.fetchall()}
+            if not data:
+                return None
+            is_running = bool(int(data.get("is_running", "0")))
+            cfg = json.loads(data.get("config", "{}"))
+            return {"is_running": is_running, "config": cfg}
+
+    @sqlite_retry()
+    def get_ui_state(self) -> Dict[str, Any]:
+        """Retrieves persisted frontend UI state dictionary from SQLite."""
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT value FROM app_kv_store WHERE key = 'ui_state' LIMIT 1;")
+            row = cur.fetchone()
+            if row:
+                try:
+                    data = json.loads(row["value"])
+                    if isinstance(data, dict):
+                        return data
+                except Exception:
+                    pass
+        return {}
+
+    @sqlite_retry()
+    def save_ui_state(self, patch: Dict[str, Any]) -> Dict[str, Any]:
+        """Merges partial or full UI state into SQLite so state survives refreshes & restarts."""
+        if not isinstance(patch, dict):
+            return self.get_ui_state()
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT value FROM app_kv_store WHERE key = 'ui_state' LIMIT 1;")
+            row = cur.fetchone()
+            current: Dict[str, Any] = {}
+            if row:
+                try:
+                    loaded = json.loads(row["value"])
+                    if isinstance(loaded, dict):
+                        current = loaded
+                except Exception:
+                    pass
+            current.update(patch)
+            conn.execute(
+                """
+                INSERT INTO app_kv_store (key, value, updated_at)
+                VALUES ('ui_state', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at;
+                """,
+                (json.dumps(current), now_iso),
+            )
+            conn.commit()
+            return current
+
+    @sqlite_retry()
+    def save_setting(self, key: str, value: Any):
+        """Persists an arbitrary application setting (e.g., proxy_mode) in SQLite."""
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO app_kv_store (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at;
+                """,
+                (str(key), json.dumps(value), now_iso),
+            )
+            conn.commit()
+
+    @sqlite_retry()
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Retrieves an arbitrary application setting from SQLite."""
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT value FROM app_kv_store WHERE key = ? LIMIT 1;", (str(key),))
+            row = cur.fetchone()
+            if row:
+                try:
+                    return json.loads(row["value"])
+                except Exception:
+                    return row["value"]
+        return default
+
+    @staticmethod
+    def is_record_stale_or_recycled(
+        record: Dict[str, Any],
+        max_delivery_age_days: int = 60,
+        current_tab_month: Optional[str] = None,
+    ) -> bool:
+        """
+        Solves Risk #5 (Recycled AWB Trap):
+        Airlines recycle 8-digit serials every 6 to 12 months.
+        If an AWB is DELIVERED, but its last updated date is > max_delivery_age_days ago
+        or appears in a distinct new month tab, treat it as recycled and verify anew.
+        """
+        if not record or record.get("status") != "DELIVERED":
+            return True  # Active shipments always tracked
+
+        last_up = record.get("last_updated_at")
+        if last_up:
+            try:
+                dt = datetime.strptime(last_up.split()[0], "%Y-%m-%d")
+                age_days = (datetime.now() - dt).days
+                if age_days > max_delivery_age_days:
+                    return True  # Recycled AWB from previous cycle
+            except Exception:
+                pass
+
+        return False
 
     @staticmethod
     def _clean_awb_key(awb: str) -> str:
@@ -143,6 +306,7 @@ class MasterLedgerManager:
             return "No Active Route (AWB Not Found)"
         return f"{orig or '---'} ➔ {dest or '---'}"
 
+    @sqlite_retry()
     def upsert_record(self, record: UnifiedTrackingRecord) -> Dict[str, Any]:
         """
         Upserts a single UnifiedTrackingRecord.
@@ -221,6 +385,7 @@ class MasterLedgerManager:
 
         return self.get_record_by_awb(clean_key) or {}
 
+    @sqlite_retry()
     def upsert_batch(self, records: List[UnifiedTrackingRecord]) -> int:
         """Batch upsert multiple records inside a single transaction."""
         count = 0
@@ -230,6 +395,7 @@ class MasterLedgerManager:
                 count += 1
         return count
 
+    @sqlite_retry()
     def get_record_by_awb(self, clean_or_formatted_awb: str) -> Optional[Dict[str, Any]]:
         clean_key = self._clean_awb_key(clean_or_formatted_awb)
         with self._get_connection() as conn:
@@ -239,6 +405,7 @@ class MasterLedgerManager:
                 return dict(row)
         return None
 
+    @sqlite_retry()
     def get_all_records(
         self,
         search: Optional[str] = None,
@@ -291,6 +458,7 @@ class MasterLedgerManager:
         """Returns shipments marked DELIVERED (completed archive)."""
         return self.get_all_records(lifecycle="delivered", limit=limit)
 
+    @sqlite_retry()
     def get_summary_stats(self) -> Dict[str, Any]:
         """Calculates live summary metrics for the Master Sheet dashboard."""
         with self._get_connection() as conn:

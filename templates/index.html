@@ -570,7 +570,19 @@
                         </div>
                     </div>
                 </div>
-                <div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <!-- Proxy & Anti-Detection Selector -->
+                    <div class="proxy-control-pill" style="display: flex; align-items: center; gap: 8px; background: #ffffff; border: 1.5px solid #bfdbfe; border-radius: 9999px; padding: 5px 14px; font-size: 0.8rem; font-weight: 700; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <span id="proxyStatusDot" class="status-dot" style="background: #22c55e;"></span>
+                        <span id="proxyModeLabel" style="font-size: 0.78rem;">Proxy: DIRECT</span>
+                        <select id="proxyModeSelect" onchange="changeProxyMode(this.value)" style="border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; font-size: 0.76rem; font-weight: 700; color: #2563eb; cursor: pointer; padding: 2px 6px;">
+                            <option value="off">Direct (Polite Jitter)</option>
+                            <option value="tor">🧅 Tor SOCKS5 (Free Rotating IPs)</option>
+                            <option value="free_pool">🌐 Free Proxy Pool</option>
+                            <option value="custom">⚙️ Custom Proxy</option>
+                        </select>
+                    </div>
+
                     <a href="/docs" target="_blank" class="btn-swagger">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span>Swagger REST API</span>
@@ -1272,7 +1284,7 @@
                     </div>
 
                     <div>
-                        <button class="btn-inspect-premium" style="width: 100%; padding: 12px; justify-content: center; background: #0f172a; color: #fff; border-color: #0f172a; font-size: 0.88rem;" onclick="triggerAutoPilotRunNow()" title="Trigger a cycle right now">
+                        <button id="btnAutoPilotRunNow" class="btn-inspect-premium" style="width: 100%; padding: 12px; justify-content: center; background: #0f172a; color: #fff; border-color: #0f172a; font-size: 0.88rem;" onclick="triggerAutoPilotRunNow()" title="Trigger a cycle right now">
                             <span>⚡ Run Cycle Now</span>
                         </button>
                     </div>
@@ -1473,7 +1485,7 @@
         let currentBulkData = null;
         let currentBulkRecords = [];
 
-        function switchDashboardMode(mode) {
+        function switchDashboardMode(mode, skipSave = false) {
             const btnSingle = document.getElementById('btnModeSingle');
             const btnBulk = document.getElementById('btnModeBulk');
             const btnLedger = document.getElementById('btnModeLedger');
@@ -1493,6 +1505,10 @@
             if (secLedger) secLedger.style.display = 'none';
             if (secSheets) secSheets.style.display = 'none';
 
+            if (!skipSave && window.AppState) {
+                AppState.set({ activeDashboardMode: mode });
+            }
+
             if (mode === 'bulk') {
                 btnBulk.classList.add('active');
                 secBulk.style.display = 'block';
@@ -1505,7 +1521,7 @@
                 if (btnSheets) btnSheets.classList.add('active');
                 if (secSheets) secSheets.style.display = 'block';
                 logTerminal('Switched view to Google Sheets Auto-Tracker.', 'info');
-                loadSheetLifecycle('all');
+                loadSheetLifecycle(currentSheetLifecycleFilter || 'all');
                 fetchAutoPilotStatus();
                 ensureAutoPilotPolling();
             } else {
@@ -1515,11 +1531,15 @@
             }
         }
 
-        function switchBulkTab(tab) {
+        function switchBulkTab(tab, skipSave = false) {
             const tabPaste = document.getElementById('tabPasteBtn');
             const tabUpload = document.getElementById('tabUploadBtn');
             const panelPaste = document.getElementById('panelPasteArea');
             const panelUpload = document.getElementById('panelUploadArea');
+
+            if (!skipSave && window.AppState) {
+                AppState.set({ bulkActiveSubTab: tab });
+            }
 
             if (tab === 'upload') {
                 tabPaste.classList.remove('active');
@@ -1576,6 +1596,7 @@
             document.getElementById('bulkTextarea').value = '';
             document.getElementById('fileUploadInput').value = '';
             document.getElementById('fileBadge').style.display = 'none';
+            if (window.AppState) AppState.set({ bulkTextarea: '' });
             logTerminal('Cleared input fields.', 'info');
         }
 
@@ -2460,11 +2481,13 @@
                 input.focus();
                 updateClearButton();
             }
+            if (window.AppState) AppState.set({ singleAwbInput: '' });
         }
 
         function setAwb(awb, carrier) {
             document.getElementById('awbInput').value = awb;
             document.getElementById('carrierSelect').value = carrier;
+            if (window.AppState) AppState.set({ singleAwbInput: awb, singleCarrierSelect: carrier });
             updateClearButton();
             trackAWB();
         }
@@ -3310,9 +3333,18 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     tabSelect.value = tab;
                 }
             }
+            const sInput = document.getElementById('gSheetStartRowInput');
             if (startRow !== undefined && startRow !== null) {
-                const sInput = document.getElementById('gSheetStartRowInput');
                 if (sInput) sInput.value = startRow;
+            } else if (startRow === null) {
+                if (sInput) sInput.value = '';
+            }
+            if (window.AppState) {
+                AppState.set({
+                    gSheetUrl: url,
+                    gSheetTab: tab || (tabSelect ? tabSelect.value : 'NOV-26'),
+                    gSheetStartRow: startRow !== undefined && startRow !== null ? String(startRow) : '',
+                });
             }
         }
 
@@ -3354,7 +3386,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 const tabSelected = data.selected_tab || data.sheet_name || 'NOV-26';
                 const previewList = data.preview_records || data.preview_manifest || [];
 
-                // Populate tabs dropdown if available
+                // Populate tabs dropdown if available & persist discovered tabs
                 if (tabs.length > 0) {
                     const tabSelect = document.getElementById('gSheetTabSelect');
                     if (tabSelect) {
@@ -3365,6 +3397,14 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                             opt.innerText = s;
                             if (s === tabSelected) opt.selected = true;
                             tabSelect.appendChild(opt);
+                        });
+                    }
+                    if (window.AppState) {
+                        AppState.set({
+                            gSheetAvailableTabs: tabs,
+                            gSheetTab: tabSelected,
+                            gSheetUrl: url,
+                            gSheetCol: targetCol,
                         });
                     }
                 }
@@ -3463,7 +3503,9 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
 
             if (syncBtn) {
                 syncBtn.disabled = true;
-                syncBtn.innerHTML = '<span>⚡ Syncing & Tracking Active Shipments...</span>';
+                syncBtn.style.opacity = '0.65';
+                syncBtn.style.cursor = 'not-allowed';
+                syncBtn.innerHTML = '<span class="status-dot pulsing" style="background:#22c55e;"></span> <span>⏳ Syncing & Tracking Active Shipments in Background...</span>';
             }
             logTerminal(`[Google Sheets Lifecycle Engine] Initiating automated sync across multi-airline portals (Start Row: ${startRow || 'Auto'})...`, 'info');
 
@@ -3493,6 +3535,8 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             } finally {
                 if (syncBtn) {
                     syncBtn.disabled = false;
+                    syncBtn.style.opacity = '1';
+                    syncBtn.style.cursor = 'pointer';
                     syncBtn.innerHTML = '⚡ Auto-Track Lifecycle (Sync Active On-The-Way)';
                 }
             }
@@ -3543,6 +3587,10 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             if (btnAll) btnAll.classList.toggle('active', view === 'all');
             if (btnAct) btnAct.classList.toggle('active', view === 'active');
             if (btnDel) btnDel.classList.toggle('active', view === 'delivered');
+
+            if (window.AppState) {
+                AppState.set({ sheetLifecycleFilter: view });
+            }
 
             loadSheetLifecycle(view);
         }
@@ -3721,7 +3769,15 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
         }
 
         async function triggerAutoPilotRunNow() {
-            logTerminal(`[Auto-Pilot] Manual trigger requested. Running immediate sync cycle...`, 'info');
+            const btn = document.getElementById('btnAutoPilotRunNow');
+            const originalHtml = btn ? btn.innerHTML : '<span>⚡ Run Cycle Now</span>';
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.65';
+                btn.style.cursor = 'not-allowed';
+                btn.innerHTML = '<span class="status-dot pulsing" style="background:#38bdf8;"></span> <span>⏳ Running Cycle in Background...</span>';
+            }
+            logTerminal(`[Auto-Pilot] Manual trigger requested. Running immediate sync cycle in background...`, 'info');
             try {
                 const resp = await fetch('/api/v1/sheets/autopilot/run-now', { method: 'POST' });
                 const data = await resp.json();
@@ -3734,6 +3790,13 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 await loadMasterLedger();
             } catch (err) {
                 logTerminal(`[Auto-Pilot Run Error] ${err.message}`, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.innerHTML = originalHtml;
+                }
             }
         }
 
@@ -3744,18 +3807,37 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 if (!resp.ok) return;
 
                 const isRunning = data.is_running;
+                const isCycling = data.stats && data.stats.is_cycling;
                 const toggle = document.getElementById('autoPilotToggleCheckbox');
                 const badge = document.getElementById('autoPilotStatusBadge');
                 const txt = document.getElementById('autoPilotStatusText');
                 const lbl = document.getElementById('toggleLabelText');
                 const countdown = document.getElementById('autoPilotCountdown');
                 const cycles = document.getElementById('autoPilotCycleCount');
+                const runBtn = document.getElementById('btnAutoPilotRunNow');
 
                 if (toggle) toggle.checked = isRunning;
                 if (lbl) lbl.innerText = isRunning ? 'Auto-Pilot is ON' : 'Auto-Pilot is OFF';
 
+                if (runBtn) {
+                    if (isCycling) {
+                        runBtn.disabled = true;
+                        runBtn.style.opacity = '0.65';
+                        runBtn.style.cursor = 'not-allowed';
+                        runBtn.innerHTML = '<span class="status-dot pulsing" style="background:#38bdf8;"></span> <span>⏳ Background Cycle Active...</span>';
+                    } else if (runBtn.disabled && runBtn.innerHTML.includes('Background Cycle Active')) {
+                        runBtn.disabled = false;
+                        runBtn.style.opacity = '1';
+                        runBtn.style.cursor = 'pointer';
+                        runBtn.innerHTML = '<span>⚡ Run Cycle Now</span>';
+                    }
+                }
+
                 if (badge && txt) {
-                    if (isRunning) {
+                    if (isCycling) {
+                        badge.className = 'badge-status bs-in-transit';
+                        txt.innerText = '⚡ CYCLE IN PROGRESS';
+                    } else if (isRunning) {
                         badge.className = 'badge-status bs-delivered';
                         txt.innerText = `RUNNING (Every ${data.config?.interval_minutes || 30}m)`;
                     } else {
@@ -3767,7 +3849,9 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 if (cycles) cycles.innerText = data.stats?.total_cycles || 0;
 
                 if (countdown) {
-                    if (isRunning && data.next_run_countdown_sec > 0) {
+                    if (isCycling) {
+                        countdown.innerText = 'Syncing now...';
+                    } else if (isRunning && data.next_run_countdown_sec > 0) {
                         const m = Math.floor(data.next_run_countdown_sec / 60);
                         const s = data.next_run_countdown_sec % 60;
                         countdown.innerText = `${m}m ${s < 10 ? '0' : ''}${s}s`;
@@ -3778,8 +3862,10 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     }
                 }
 
-                // If Auto-Pilot is stopped, stop the interval polling to avoid unnecessary requests on server
-                if (!isRunning && autoPilotPollingTimer) {
+                // Keep polling if running or actively cycling
+                if (isRunning || isCycling) {
+                    ensureAutoPilotPolling();
+                } else if (autoPilotPollingTimer) {
                     clearInterval(autoPilotPollingTimer);
                     autoPilotPollingTimer = null;
                 }
@@ -3788,15 +3874,287 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             }
         }
 
-        function ensureAutoPilotPolling() {
-            if (!autoPilotPollingTimer) {
-                autoPilotPollingTimer = setInterval(fetchAutoPilotStatus, 4000);
+        async function loadProxyStatus() {
+            try {
+                const res = await fetch('/api/v1/proxy/status');
+                const data = await res.json();
+                const sel = document.getElementById('proxyModeSelect');
+                const lbl = document.getElementById('proxyModeLabel');
+                const dot = document.getElementById('proxyStatusDot');
+                if (sel) sel.value = data.mode || 'off';
+                if (lbl) {
+                    if (data.mode === 'tor') {
+                        lbl.innerText = data.tor_available ? 'Proxy: TOR SOCKS5 (Active)' : 'Proxy: TOR (Connecting...)';
+                        if (dot) dot.style.background = data.tor_available ? '#8b5cf6' : '#eab308';
+                    } else if (data.mode === 'free_pool') {
+                        lbl.innerText = `Proxy: POOL (${data.healthy_proxies_count} live)`;
+                        if (dot) dot.style.background = '#06b6d4';
+                    } else if (data.mode === 'custom') {
+                        lbl.innerText = `Proxy: CUSTOM (${data.custom_proxies_count})`;
+                        if (dot) dot.style.background = '#3b82f6';
+                    } else {
+                        lbl.innerText = 'Proxy: DIRECT (Fast)';
+                        if (dot) dot.style.background = '#22c55e';
+                    }
+                }
+            } catch (e) {
+                console.debug('Proxy status fetch error:', e);
             }
         }
 
-        // Initialize status on load (one-time fetch only, no continuous loop if OFF)
-        window.addEventListener('DOMContentLoaded', () => {
+        async function changeProxyMode(newMode) {
+            logTerminal(`[Proxy Engine] Switching proxy mode to '${newMode}'...`, 'info');
+            try {
+                const res = await fetch('/api/v1/proxy/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: newMode })
+                });
+                const d = await res.json();
+                logTerminal(`✔ ${d.message}`, 'success');
+                await loadProxyStatus();
+            } catch (err) {
+                logTerminal(`[Proxy Error] ${err.message}`, 'error');
+            }
+        }
+
+        function ensureAutoPilotPolling() {
+            if (!autoPilotPollingTimer) {
+                autoPilotPollingTimer = setInterval(fetchAutoPilotStatus, 3500);
+            }
+        }
+
+        // ================= PRODUCTION CENTRALIZED STATE MANAGEMENT =================
+        window.AppState = {
+            STORAGE_KEY: 'global_cargo_tracker_state_v1',
+            _syncTimer: null,
+            _hasPendingSync: false,
+            state: {
+                activeDashboardMode: 'single',
+                singleAwbInput: '',
+                singleCarrierSelect: 'auto',
+                bulkActiveSubTab: 'paste',
+                bulkTextarea: '',
+                bulkWorkersSelect: '5',
+                bulkSearchInput: '',
+                ledgerSearchInput: '',
+                gSheetUrl: 'https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing',
+                gSheetCol: 'H',
+                gSheetTab: 'NOV-26',
+                gSheetAvailableTabs: ['NOV-26', 'OCT-26', 'SEP-26'],
+                gSheetStartRow: '110',
+                gSheetScanAllTabs: false,
+                sheetLifecycleFilter: 'all',
+                autoPilotInterval: '30',
+            },
+
+            loadLocal() {
+                try {
+                    const raw = localStorage.getItem(this.STORAGE_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && typeof parsed === 'object') {
+                            this.state = { ...this.state, ...parsed };
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    console.debug('[AppState] localStorage read error:', e);
+                }
+                return false;
+            },
+
+            saveLocal() {
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.state));
+                } catch (e) {
+                    console.debug('[AppState] localStorage write error:', e);
+                }
+            },
+
+            set(patch, options = {}) {
+                if (!patch || typeof patch !== 'object') return;
+                this.state = { ...this.state, ...patch };
+                this.saveLocal();
+                if (!options.silent) {
+                    this.syncToServerDebounced();
+                }
+            },
+
+            syncToServerDebounced() {
+                this._hasPendingSync = true;
+                if (this._syncTimer) clearTimeout(this._syncTimer);
+                this._syncTimer = setTimeout(() => {
+                    this.syncToServerNow();
+                }, 300);
+            },
+
+            async syncToServerNow() {
+                this._hasPendingSync = false;
+                try {
+                    await fetch('/api/v1/state', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.state),
+                    });
+                } catch (e) {
+                    console.debug('[AppState] Server sync error:', e);
+                }
+            },
+
+            flushOnUnload() {
+                if (this._hasPendingSync && navigator.sendBeacon) {
+                    try {
+                        const blob = new Blob([JSON.stringify(this.state)], { type: 'application/json' });
+                        navigator.sendBeacon('/api/v1/state', blob);
+                        this._hasPendingSync = false;
+                    } catch (e) {}
+                }
+            },
+
+            ensureTabOptions(tabsList, selectedTab) {
+                const tabSelect = document.getElementById('gSheetTabSelect');
+                if (!tabSelect) return;
+
+                const tabs = Array.isArray(tabsList) && tabsList.length > 0 ? [...tabsList] : [];
+                if (selectedTab && !tabs.includes(selectedTab)) {
+                    tabs.unshift(selectedTab);
+                }
+                if (tabs.length > 0) {
+                    tabSelect.innerHTML = '';
+                    tabs.forEach((t) => {
+                        const opt = document.createElement('option');
+                        opt.value = t;
+                        opt.innerText = t;
+                        if (t === selectedTab) opt.selected = true;
+                        tabSelect.appendChild(opt);
+                    });
+                }
+                if (selectedTab) {
+                    tabSelect.value = selectedTab;
+                }
+            },
+
+            applyToDOM(st) {
+                // 1. Google Sheets Auto-Tracker Controls
+                const urlEl = document.getElementById('gSheetUrlInput');
+                if (urlEl && st.gSheetUrl !== undefined) urlEl.value = st.gSheetUrl;
+
+                const colEl = document.getElementById('gSheetColSelect');
+                if (colEl && st.gSheetCol) colEl.value = st.gSheetCol;
+
+                this.ensureTabOptions(st.gSheetAvailableTabs, st.gSheetTab);
+
+                const rowEl = document.getElementById('gSheetStartRowInput');
+                if (rowEl && st.gSheetStartRow !== undefined) rowEl.value = st.gSheetStartRow;
+
+                const scanAllEl = document.getElementById('gSheetScanAllTabs');
+                if (scanAllEl) scanAllEl.checked = Boolean(st.gSheetScanAllTabs);
+
+                const intervalEl = document.getElementById('autoPilotIntervalSelect');
+                if (intervalEl && st.autoPilotInterval) intervalEl.value = String(st.autoPilotInterval);
+
+                // 2. Sheet Lifecycle Filter Pills
+                if (st.sheetLifecycleFilter) {
+                    currentSheetLifecycleFilter = st.sheetLifecycleFilter;
+                    const btnAll = document.getElementById('pillSheetAllBtn');
+                    const btnAct = document.getElementById('pillSheetActiveBtn');
+                    const btnDel = document.getElementById('pillSheetDeliveredBtn');
+                    if (btnAll) btnAll.classList.toggle('active', st.sheetLifecycleFilter === 'all');
+                    if (btnAct) btnAct.classList.toggle('active', st.sheetLifecycleFilter === 'active');
+                    if (btnDel) btnDel.classList.toggle('active', st.sheetLifecycleFilter === 'delivered');
+                }
+
+                // 3. Single & Bulk Tracker Inputs
+                const awbEl = document.getElementById('awbInput');
+                if (awbEl && st.singleAwbInput !== undefined) {
+                    awbEl.value = st.singleAwbInput;
+                    if (typeof updateClearButton === 'function') updateClearButton();
+                }
+                const carEl = document.getElementById('carrierSelect');
+                if (carEl && st.singleCarrierSelect) carEl.value = st.singleCarrierSelect;
+
+                const bulkTxtEl = document.getElementById('bulkTextarea');
+                if (bulkTxtEl && st.bulkTextarea !== undefined) bulkTxtEl.value = st.bulkTextarea;
+
+                const bulkWorkersEl = document.getElementById('bulkWorkersSelect');
+                if (bulkWorkersEl && st.bulkWorkersSelect) bulkWorkersEl.value = String(st.bulkWorkersSelect);
+
+                const bulkSearchEl = document.getElementById('bulkSearchInput');
+                if (bulkSearchEl && st.bulkSearchInput !== undefined) bulkSearchEl.value = st.bulkSearchInput;
+
+                const ledgerSearchEl = document.getElementById('ledgerSearchInput');
+                if (ledgerSearchEl && st.ledgerSearchInput !== undefined) ledgerSearchEl.value = st.ledgerSearchInput;
+
+                if (st.bulkActiveSubTab) {
+                    switchBulkTab(st.bulkActiveSubTab, true);
+                }
+
+                // 4. Active Dashboard Mode (single / bulk / ledger / sheets)
+                if (st.activeDashboardMode) {
+                    switchDashboardMode(st.activeDashboardMode, true);
+                }
+            },
+
+            bindListeners() {
+                const bind = (id, stateKey, eventName = 'input', transform = (el) => el.value) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.addEventListener(eventName, () => {
+                        this.set({ [stateKey]: transform(el) });
+                    });
+                };
+
+                bind('gSheetUrlInput', 'gSheetUrl', 'input');
+                bind('gSheetColSelect', 'gSheetCol', 'change');
+                bind('gSheetTabSelect', 'gSheetTab', 'change');
+                bind('gSheetStartRowInput', 'gSheetStartRow', 'input');
+                bind('gSheetScanAllTabs', 'gSheetScanAllTabs', 'change', (el) => el.checked);
+                bind('autoPilotIntervalSelect', 'autoPilotInterval', 'change');
+
+                bind('awbInput', 'singleAwbInput', 'input');
+                bind('carrierSelect', 'singleCarrierSelect', 'change');
+                bind('bulkTextarea', 'bulkTextarea', 'input');
+                bind('bulkWorkersSelect', 'bulkWorkersSelect', 'change');
+                bind('bulkSearchInput', 'bulkSearchInput', 'input');
+                bind('ledgerSearchInput', 'ledgerSearchInput', 'input');
+
+                window.addEventListener('beforeunload', () => this.flushOnUnload());
+            },
+
+            async init() {
+                const hadLocal = this.loadLocal();
+                if (hadLocal) {
+                    this.applyToDOM(this.state);
+                }
+                this.bindListeners();
+
+                // Reconcile with backend SQLite state (survives browser cache clear / new device / restart)
+                try {
+                    const res = await fetch('/api/v1/state');
+                    if (res.ok) {
+                        const data = await res.json();
+                        const serverState = data && data.state ? data.state : {};
+                        if (!hadLocal && Object.keys(serverState).length > 0) {
+                            this.state = { ...this.state, ...serverState };
+                            this.saveLocal();
+                            this.applyToDOM(this.state);
+                        } else if (hadLocal && Object.keys(serverState).length === 0) {
+                            // Seed backend with local state
+                            this.syncToServerNow();
+                        }
+                    }
+                } catch (e) {
+                    console.debug('[AppState] Could not fetch server state:', e);
+                }
+            }
+        };
+
+        // Initialize status & persistent state on load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await AppState.init();
             fetchAutoPilotStatus();
+            loadProxyStatus();
         });
 
 

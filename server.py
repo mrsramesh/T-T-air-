@@ -49,6 +49,9 @@ from bulk_tracker.google_sheets import (
     GoogleSheetError,
 )
 from bulk_tracker.autopilot import AutoPilotManager
+from bulk_tracker.proxy_pool import proxy_pool
+from bulk_tracker.circuit_breaker import circuit_breaker
+from bulk_tracker.notifier import notifier
 
 sheets_tracker = GoogleSheetsTracker()
 autopilot = AutoPilotManager(sheets_tracker, master_ledger)
@@ -58,6 +61,26 @@ app = FastAPI(
     description="Industry-level API service for tracking Air India Cargo (098), Lufthansa Cargo (020), Emirates SkyCargo (176), Kuwait Airways (229), British Airways Cargo (125), Virgin Atlantic Cargo (932), Qatar Airways Cargo (157), EgyptAir Cargo (077), Neos Air Cargo (703), and IndiGo CarGo (312). Features bulk extraction, Excel export, and concurrent multi-carrier tracking.",
     version="11.0.0",
 )
+
+@app.on_event("startup")
+def on_app_startup():
+    """
+    Solves Risk #6: Automatically restores Auto-Pilot daemon state and Proxy Mode across server/Docker restarts.
+    """
+    saved_proxy = master_ledger.get_setting("proxy_mode")
+    if isinstance(saved_proxy, dict) and saved_proxy.get("mode"):
+        proxy_pool.set_mode(saved_proxy["mode"], saved_proxy.get("custom_proxies"))
+        print(f"[Startup] Restored persisted Proxy Mode: {saved_proxy['mode']}")
+
+    resumed = autopilot.resume_from_storage()
+    if resumed:
+        print("[Startup] Auto-Pilot background daemon successfully resumed from persistent storage.")
+    else:
+        print("[Startup] Auto-Pilot is idle (toggle was OFF).")
+
+    # Check and report proxy status
+    status = proxy_pool.get_status()
+    print(f"[Startup] Proxy Engine initialized: Mode={status['mode']}, TorAvailable={status['tor_available']}, HealthyProxies={status['healthy_proxies_count']}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -545,6 +568,74 @@ def get_lifecycle_shipments(
         "stats": stats,
         "total_matched": len(records),
         "records": records,
+    }
+
+
+class ProxyModeRequest(BaseModel):
+    mode: str
+    custom_proxies: Optional[List[str]] = None
+
+
+@app.get("/api/v1/proxy/status", tags=["Proxy Engine"])
+def get_proxy_status():
+    """Returns proxy pool health metrics, active mode, and Tor connectivity."""
+    return proxy_pool.get_status()
+
+
+@app.post("/api/v1/proxy/mode", tags=["Proxy Engine"])
+def set_proxy_mode(payload: ProxyModeRequest):
+    """Sets active proxy routing mode ('off', 'tor', 'free_pool', 'custom') and persists it."""
+    proxy_pool.set_mode(payload.mode, payload.custom_proxies)
+    master_ledger.save_setting("proxy_mode", {"mode": payload.mode, "custom_proxies": payload.custom_proxies})
+    return {
+        "status": "success",
+        "message": f"Proxy mode updated to '{payload.mode}'",
+        "data": proxy_pool.get_status()
+    }
+
+
+@app.get("/api/v1/state", tags=["State Management"])
+def get_app_state():
+    """Returns persisted UI & application state from SQLite."""
+    return {
+        "status": "success",
+        "state": master_ledger.get_ui_state()
+    }
+
+
+@app.post("/api/v1/state", tags=["State Management"])
+def save_app_state(payload: Dict[str, Any]):
+    """Merges and persists UI & application state into SQLite."""
+    updated = master_ledger.save_ui_state(payload)
+    return {
+        "status": "success",
+        "state": updated
+    }
+
+
+@app.get("/api/v1/health/carriers", tags=["Carrier Health & Circuit Breakers"])
+def get_carrier_health():
+    """Returns circuit breaker status, failure counters, and fallback states for all carriers."""
+    return {
+        "status": "success",
+        "carriers": circuit_breaker.get_all_status()
+    }
+
+
+class AlertTestRequest(BaseModel):
+    title: Optional[str] = "Tracking System Test Alert"
+    message: Optional[str] = "This is a verified test notification from the Multi-Carrier Tracking Engine."
+
+
+@app.post("/api/v1/alerts/test", tags=["Alerts & Notifications"])
+def test_alert(payload: AlertTestRequest):
+    """Dispatches a test notification via Telegram or configured webhook."""
+    notifier.send_alert_async(payload.title, payload.message, level="info")
+    return {
+        "status": "success",
+        "message": "Test alert dispatched to background worker.",
+        "telegram_configured": bool(notifier.telegram_bot_token and notifier.telegram_chat_id),
+        "webhook_configured": bool(notifier.webhook_url)
     }
 
 

@@ -8,7 +8,6 @@ import re
 import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
-from playwright.sync_api import sync_playwright
 
 from parcels_tracker.constants import (
     PARCELSAPP_URL,
@@ -91,30 +90,8 @@ class ParcelsTrackerClient:
 
         intercepted_data: Dict[str, Any] = {}
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-web-security",
-                    "--disable-features=IsolateOrigins,site-per-process",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1440, "height": 900},
-                locale="en-US",
-                timezone_id="Asia/Kolkata",
-            )
-            page = context.new_page()
-
-            # Inject WebGL & webdriver stealth bypasses
-            page.add_init_script(STEALTH_SCRIPT)
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=self.timeout_ms) as (page, context, browser):
 
             # Intercept api/v2/parcels responses
             def on_response(res):
@@ -221,8 +198,6 @@ class ParcelsTrackerClient:
                 os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                 page.screenshot(path=screenshot_path, full_page=True)
                 logger.info(f"Saved full page screenshot to {screenshot_path}")
-
-            browser.close()
 
         if not intercepted_data or not intercepted_data.get("states"):
             raise ParcelsShipmentNotFoundError(
