@@ -61,12 +61,45 @@
         .badge-ey { background: #b4975a; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #78350f; }
         .badge-sv { background: #006c35; color: white; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; border: 1px solid #004d26; }
 
-        /* Mode Switcher */
-        .mode-switch-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px; background: white; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .mode-switch { display: flex; gap: 8px; background: #f1f5f9; padding: 4px; border-radius: 10px; }
-        .mode-btn { border: none; background: transparent; padding: 9px 20px; border-radius: 8px; font-weight: 700; font-size: 0.92rem; color: #475569; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
-        .mode-btn.active { background: #2563eb; color: #ffffff; box-shadow: 0 2px 4px rgba(37,99,235,0.25); }
-        .mode-btn:hover:not(.active) { color: #0f172a; background: #e2e8f0; }
+        /* Enterprise Workspace Layout & Vertical Sidebar */
+        .workspace-shell { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+        .vertical-sidebar { position: sticky; top: 1rem; background: #ffffff; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05); display: flex; flex-direction: column; gap: 1rem; }
+        .sidebar-section-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; padding: 0 0.5rem; margin-bottom: 0.25rem; }
+        .mode-switch { display: flex; flex-direction: column; gap: 6px; background: transparent; padding: 0; }
+        .mode-btn { width: 100%; border: 1px solid transparent; background: transparent; padding: 11px 12px; border-radius: 12px; font-weight: 700; font-size: 0.88rem; color: #475569; cursor: pointer; transition: all 0.18s ease; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+        .mode-btn-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .mode-btn-icon { width: 32px; height: 32px; border-radius: 9px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; transition: all 0.18s; }
+        .mode-btn-text { display: flex; flex-direction: column; min-width: 0; }
+        .mode-btn-title { font-size: 0.86rem; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mode-btn-sub { font-size: 0.71rem; font-weight: 500; color: #94a3b8; margin-top: 2px; }
+        .mode-btn:hover:not(.active) { color: #0f172a; background: #f8fafc; border-color: #e2e8f0; }
+        .mode-btn.active { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; box-shadow: 0 6px 16px -3px rgba(37,99,235,0.35); border-color: #1d4ed8; }
+        .mode-btn.active .mode-btn-icon { background: rgba(255,255,255,0.2); color: #ffffff; }
+        .mode-btn.active .mode-btn-sub { color: rgba(255,255,255,0.82); }
+        .sidebar-pulse-card { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem; font-size: 0.78rem; }
+        .sidebar-pulse-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; color: #475569; font-weight: 600; }
+        .sidebar-pulse-val { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #0f172a; }
+        .workspace-main { min-width: 0; }
+
+        /* Multi-Sheet Source Cards */
+        .sheet-source-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 12px; background: #ffffff; transition: all 0.15s; flex-wrap: wrap; }
+        .sheet-source-item.enabled { border-color: #bfdbfe; background: linear-gradient(90deg, #ffffff 0%, #f8fbff 100%); }
+        .sheet-source-item.disabled { opacity: 0.68; background: #f8fafc; }
+        .sheet-source-meta { display: flex; flex-direction: column; gap: 4px; min-width: 240px; flex: 1; }
+        .sheet-source-title { font-weight: 800; font-size: 0.92rem; color: #0f172a; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .sheet-source-sub { font-size: 0.76rem; color: #64748b; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .sheet-source-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .source-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.71rem; font-weight: 700; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .source-pill.central { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+        .dual-table-card { background: #ffffff; border: 1px solid var(--border); border-radius: 16px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04); }
+        .dual-table-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 1rem; flex-wrap: wrap; }
+
+        @media (max-width: 1024px) {
+            .workspace-shell { grid-template-columns: 1fr; }
+            .vertical-sidebar { position: static; }
+            .mode-switch { flex-direction: row; flex-wrap: wrap; }
+            .mode-btn { width: auto; flex: 1 1 200px; }
+        }
 
         /* Single Tracker Styles */
         .search-card { background: var(--card-bg); border-radius: 14px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05); margin-bottom: 1.5rem; }
@@ -614,26 +647,76 @@
             </div>
         </header>
 
-        <!-- Mode Switcher (Single vs Bulk Engine) -->
-        <div class="mode-switch-wrap">
-            <div class="mode-switch">
-                <button id="btnModeSingle" class="mode-btn active" onclick="switchDashboardMode('single')">
-                    🔍 Single AWB Tracker
-                </button>
-                <button id="btnModeBulk" class="mode-btn" onclick="switchDashboardMode('bulk')">
-                    ⚡ Bulk & Multi-AWB Engine (Batch & Excel)
-                </button>
-                <button id="btnModeLedger" class="mode-btn" onclick="switchDashboardMode('ledger')">
-                    📋 Master Cargo Sheet (Historical Ledger) <span id="navLedgerBadge" style="background:#0f172a;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.75rem;margin-left:6px;font-family:'JetBrains Mono',monospace;">0</span>
-                </button>
-                <button id="btnModeSheets" class="mode-btn" onclick="switchDashboardMode('sheets')">
-                    🌐 Google Sheets Auto-Tracker
-                </button>
-            </div>
-            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Enterprise 13-Carrier Tracking & Anti-Bot Protection</div>
-        </div>
+        <!-- Workspace Shell: Vertical Left Sidebar + Main Content -->
+        <div class="workspace-shell">
+            <aside class="vertical-sidebar">
+                <div>
+                    <div class="sidebar-section-label">Workspace Navigation</div>
+                    <div class="mode-switch">
+                        <button id="btnModeSingle" class="mode-btn active" onclick="switchDashboardMode('single')">
+                            <span class="mode-btn-left">
+                                <span class="mode-btn-icon">🔍</span>
+                                <span class="mode-btn-text">
+                                    <span class="mode-btn-title">Single AWB Tracker</span>
+                                    <span class="mode-btn-sub">13-Airline Live Lookup</span>
+                                </span>
+                            </span>
+                        </button>
+                        <button id="btnModeBulk" class="mode-btn" onclick="switchDashboardMode('bulk')">
+                            <span class="mode-btn-left">
+                                <span class="mode-btn-icon">⚡</span>
+                                <span class="mode-btn-text">
+                                    <span class="mode-btn-title">Bulk &amp; Multi-AWB</span>
+                                    <span class="mode-btn-sub">Batch Paste &amp; Excel</span>
+                                </span>
+                            </span>
+                        </button>
+                        <button id="btnModeLedger" class="mode-btn" onclick="switchDashboardMode('ledger')">
+                            <span class="mode-btn-left">
+                                <span class="mode-btn-icon">📋</span>
+                                <span class="mode-btn-text">
+                                    <span class="mode-btn-title">Master Cargo Sheet</span>
+                                    <span class="mode-btn-sub">Historical Ledger</span>
+                                </span>
+                            </span>
+                            <span id="navLedgerBadge" style="background:#0f172a;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.72rem;font-family:'JetBrains Mono',monospace;">0</span>
+                        </button>
+                        <button id="btnModeSheets" class="mode-btn" onclick="switchDashboardMode('sheets')">
+                            <span class="mode-btn-left">
+                                <span class="mode-btn-icon">🌐</span>
+                                <span class="mode-btn-text">
+                                    <span class="mode-btn-title">Google Sheets Sync</span>
+                                    <span class="mode-btn-sub">Multi-Sheet &amp; 2-Table</span>
+                                </span>
+                            </span>
+                            <span id="navSheetsActiveBadge" style="background:#2563eb;color:#ffffff;padding:2px 8px;border-radius:9999px;font-size:0.72rem;font-family:'JetBrains Mono',monospace;">0</span>
+                        </button>
+                    </div>
+                </div>
 
-        <div class="error-msg" id="errorBox"></div>
+                <div class="sidebar-pulse-card">
+                    <div class="sidebar-section-label" style="padding:0; margin-bottom:6px;">Live System Pulse</div>
+                    <div class="sidebar-pulse-row">
+                        <span>Enabled Sheets</span>
+                        <span class="sidebar-pulse-val" id="sidebarEnabledSheets">0 / 0</span>
+                    </div>
+                    <div class="sidebar-pulse-row">
+                        <span>Active Queue</span>
+                        <span class="sidebar-pulse-val" style="color:#2563eb;" id="sidebarActiveQueue">0</span>
+                    </div>
+                    <div class="sidebar-pulse-row">
+                        <span>Delivered Report</span>
+                        <span class="sidebar-pulse-val" style="color:#16a34a;" id="sidebarDeliveredCount">0</span>
+                    </div>
+                    <div class="sidebar-pulse-row">
+                        <span>Auto-Pilot</span>
+                        <span class="sidebar-pulse-val" id="sidebarAutoPilotState">OFF</span>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="workspace-main">
+                <div class="error-msg" id="errorBox"></div>
 
         <!-- ================= SECTION 1: SINGLE AWB TRACKER ================= -->
         <div id="singleTrackerSection">
@@ -852,10 +935,10 @@
                     <div class="bulk-run-wrap">
                         <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Concurrency:</label>
                         <select id="bulkWorkersSelect" class="worker-select">
+                            <option value="1" selected>1 Worker (Ultra-Safe Human Pace - Recommended)</option>
+                            <option value="2">2 Workers (Safe Balanced)</option>
                             <option value="3">3 Workers (Gentle)</option>
-                            <option value="5" selected>5 Workers (Recommended)</option>
-                            <option value="8">8 Workers (Fast)</option>
-                            <option value="10">10 Workers (Max)</option>
+                            <option value="5">5 Workers (Fast)</option>
                         </select>
                         <button id="btnRunBulk" class="btn-bulk-track" onclick="runBulkTracking()">
                             <span>🚀 Track All AWBs</span>
@@ -1153,31 +1236,37 @@
         </div>
 
 
-        <!-- ================= SECTION 4: GOOGLE SHEETS AUTO-TRACKER ================= -->
+        <!-- ================= SECTION 4: GOOGLE SHEETS AUTO-TRACKER (MULTI-SHEET + 2-TABLE QUEUE) ================= -->
         <div id="sheetsTrackerSection" style="display: none;">
+            <!-- Multi-Sheet Sources Manager Card -->
             <div class="gsheet-config-card">
                 <div class="gsheet-header">
                     <div>
                         <h2 class="gsheet-title">
-                            <span>📊 Google Sheets Auto-Sync & Lifecycle Tracker</span>
-                            <span class="gsheet-badge-pill">Live Two-Way Continuous Tracking</span>
+                            <span>📊 Multi-Sheet Auto-Sync &amp; Lifecycle Tracker</span>
+                            <span class="gsheet-badge-pill">Multi-Sheet • New-Tab Auto-Detect • 2-Table Queue</span>
                         </h2>
                         <div class="gsheet-subtitle">
-                            Paste your Google Sheet link. The system inspects columns, reads 11-digit AWBs from <strong>Column H</strong> (along with Customer, Destination, Packages, Weights), and continuously tracks active shipments across 13 global airlines until delivered.
+                            Add multiple Google Spreadsheets and toggle <strong>Enable / Disable Read</strong> for each one. Enabled sheets are scanned for new rows (after Start Row) &amp; newly added tabs, merged with undelivered AWBs from your Central Ledger into the <strong>Active Tracking List</strong>.
                         </div>
                     </div>
                 </div>
 
-                <!-- Google Sheet URL input & controls -->
-                <div class="gsheet-grid-row">
+                <!-- Add / Edit Google Sheet Row -->
+                <input type="hidden" id="editingSheetSourceId" value="" />
+                <div class="gsheet-grid-row" style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px;">
+                    <div style="width: 155px;">
+                        <label class="gsheet-label">Sheet Label / Name:</label>
+                        <input type="text" id="newSheetLabelInput" class="gsheet-input" placeholder="e.g. D-planning" />
+                    </div>
                     <div class="gsheet-input-wrap">
                         <label class="gsheet-label">Google Sheet Link (View / Edit access):</label>
-                        <input type="text" id="gSheetUrlInput" class="gsheet-input" value="https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/..." />
+                        <input type="text" id="gSheetUrlInput" class="gsheet-input" placeholder="Paste Google Sheet URL (https://docs.google.com/spreadsheets/d/...)" />
                     </div>
-                    <div style="width: 165px;">
-                        <label class="gsheet-label">Target Column:</label>
+                    <div style="width: 120px;">
+                        <label class="gsheet-label">Target Col:</label>
                         <select id="gSheetColSelect" class="gsheet-select">
-                            <option value="H" selected>Column H (AWB NO)</option>
+                            <option value="H" selected>Column H</option>
                             <option value="A">Column A</option>
                             <option value="B">Column B</option>
                             <option value="C">Column C</option>
@@ -1189,44 +1278,51 @@
                             <option value="J">Column J</option>
                         </select>
                     </div>
-                    <div style="width: 185px;">
-                        <label class="gsheet-label">Month / Sheet Tab:</label>
-                        <select id="gSheetTabSelect" class="gsheet-select">
-                            <option value="NOV-26" selected>NOV-26 (Active Tab)</option>
-                            <option value="OCT-26">OCT-26</option>
-                            <option value="SEP-26">SEP-26</option>
-                        </select>
+                    <div style="width: 135px;">
+                        <label class="gsheet-label">Starting Tab (opt):</label>
+                        <input type="text" id="newSheetStartTabInput" class="gsheet-input" placeholder="e.g. nov 26" title="Leave blank to scan from first tab, or enter starting tab name (ignores earlier tabs)" />
                     </div>
-                    <div style="width: 145px;">
+                    <div style="width: 95px;">
                         <label class="gsheet-label">Start Row:</label>
-                        <input type="number" id="gSheetStartRowInput" value="110" class="gsheet-input" style="text-align: center;" placeholder="110" title="Start scanning from this row downwards (e.g. 110 for H110 downwards)" />
+                        <input type="number" id="gSheetStartRowInput" value="110" class="gsheet-input" style="text-align: center;" placeholder="110" />
+                    </div>
+                    <div style="display: flex; align-items: flex-end; gap: 6px;">
+                        <button id="btnAddSheetSource" class="btn-search" style="background: #2563eb; min-width: auto; height: 42px; padding: 0 1.1rem;" onclick="addOrUpdateSheetSource()">
+                            ➕ Add Sheet
+                        </button>
+                        <button id="btnCancelEditSheet" class="quick-btn" style="display:none; height:42px;" onclick="resetSheetSourceForm()">Cancel</button>
                     </div>
                 </div>
+                <div id="sheetAddFeedbackBanner" style="display:none; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; margin-bottom: 10px;"></div>
 
-                <div style="display: flex; gap: 15px; margin-bottom: 14px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 15px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between;">
                     <label class="gsheet-checkbox-label">
-                        <input type="checkbox" id="gSheetScanAllTabs" />
-                        <span>🌐 Auto-Scan All Tabs & Future Month Tabs (detects new month tabs automatically)</span>
+                        <input type="checkbox" id="gSheetScanAllTabs" checked />
+                        <span>🌐 Auto-Scan All Tabs &amp; New Month Tabs (detects new tabs with data automatically)</span>
                     </label>
+                    <select id="gSheetTabSelect" class="gsheet-select" style="display:none;"><option value="NOV-26" selected>NOV-26</option></select>
                 </div>
 
-                <!-- Quick Sheet Buttons -->
-                <div class="gsheet-targets-bar">
-                    <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">Quick Targets:</span>
-                    <button class="quick-btn" style="border-color: #2563eb; color: #1d4ed8; font-weight: 700; background: #eff6ff;" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', 110)">⭐ User NOV-26 (from H110 - 14 AWBs)</button>
-                    <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing', 'NOV-26', null)">📄 Full NOV-26 Tab (86 AWBs)</button>
-                    <button class="quick-btn" onclick="setGSheetUrl('https://docs.google.com/spreadsheets/d/1OsdRGPcS2fLa8pI6C8rTh8eOYQMRRzhTVM2pOaN4h9U/edit?usp=sharing', 'NOV-26', 110)">📄 User Sheet 2 (OsdRG...)</button>
+                <!-- Configured Spreadsheets List (with Enable/Disable Read toggles) -->
+                <div style="margin-bottom: 14px;">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Connected Google Spreadsheets</span>
+                        <span id="multiSheetCountSummary" style="color:#2563eb;">0 Enabled</span>
+                    </div>
+                    <div id="multiSheetSourcesList" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="padding: 1rem; text-align: center; color: #64748b; border: 1px dashed var(--border); border-radius: 10px;">Loading configured spreadsheets...</div>
+                    </div>
                 </div>
 
                 <!-- Control Buttons -->
                 <div class="gsheet-actions-bar">
-                    <button class="btn-search" style="background: #0f172a; min-width: auto; height: 44px; padding: 0.7rem 1.4rem;" id="btnGSheetInspect" onclick="inspectGoogleSheet()">
-                        🔍 Inspect Sheet & Preview Cells
+                    <button class="btn-search" style="background: #0f172a; min-width: auto; height: 44px; padding: 0.7rem 1.3rem;" id="btnScanEnabledSheets" onclick="scanEnabledSheetsOnly()">
+                        🔍 Scan Enabled Sheets Now (0 Airline Hits)
                     </button>
-                    <button class="btn-bulk-track" style="background: #16a34a; padding: 0.7rem 1.4rem;" id="btnGSheetSync" onclick="runGoogleSheetSync()">
-                        ⚡ Auto-Track Lifecycle (Sync Active On-The-Way)
+                    <button class="btn-bulk-track" style="background: #16a34a; padding: 0.7rem 1.3rem;" id="btnGSheetSync" onclick="syncAndTrackEnabledSheets()">
+                        ⚡ Track Final Queue (Sheets + Central Undelivered)
                     </button>
-                    <button class="btn-bulk-track" style="background: #2563eb; padding: 0.7rem 1.4rem;" onclick="downloadSheetLifecycleExcel()">
+                    <button class="btn-bulk-track" style="background: #2563eb; padding: 0.7rem 1.3rem;" onclick="downloadSheetLifecycleExcel()">
                         📥 Download Multi-Tab Excel (.xlsx)
                     </button>
                 </div>
@@ -1245,12 +1341,11 @@
                                 </span>
                             </h3>
                             <div class="autopilot-desc">
-                                Automatically tracks new & active shipments from Google Sheet until <strong>DELIVERED</strong>. Once delivered, shipments freeze and never consume quota again.
+                                Watches all <strong>Enabled</strong> Google Sheets every <strong>5m</strong> for new/edited rows &amp; new tabs (0 airline hits unless changed) &amp; tracks active queue until <strong>DELIVERED</strong>.
                             </div>
                         </div>
                     </div>
 
-                    <!-- iOS Style Toggle Switch -->
                     <div class="autopilot-toggle-pill">
                         <span style="font-size: 0.85rem; font-weight: 700; color: #1e293b;" id="toggleLabelText">Auto-Pilot is OFF</span>
                         <label class="switch">
@@ -1260,14 +1355,13 @@
                     </div>
                 </div>
 
-                <!-- Daemon Status & Controls Row -->
                 <div class="autopilot-grid">
                     <div class="autopilot-stat-box">
                         <div class="lbl">Sync Interval</div>
                         <select id="autoPilotIntervalSelect" onchange="updateAutoPilotInterval()" class="gsheet-select" style="margin-top: 4px; padding: 5px 8px; font-size: 0.84rem;">
-                            <option value="15">Every 15 Minutes</option>
-                            <option value="30" selected>Every 30 Minutes (Recommended)</option>
-                            <option value="60">Every 1 Hour</option>
+                            <option value="30">Every 30 Minutes</option>
+                            <option value="60" selected>Every 1 Hour (Safe Recommended)</option>
+                            <option value="120">Every 2 Hours (Ultra-Safe)</option>
                             <option value="360">Every 6 Hours</option>
                             <option value="1440">Daily (Every 24 Hours)</option>
                         </select>
@@ -1295,16 +1389,12 @@
             <div id="gSheetInspectCard" class="gsheet-config-card" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                     <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
-                        <span>📋 Sheet Column Mapping & Cell Extraction Preview</span>
-                        <span id="gSheetValidCountBadge" style="background: #dbeafe; color: #1e40af; font-size: 0.8rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">86 AWBs Found</span>
+                        <span>📋 Sheet Column Mapping &amp; Cell Extraction Preview</span>
+                        <span id="gSheetValidCountBadge" style="background: #dbeafe; color: #1e40af; font-size: 0.8rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">0 AWBs Found</span>
                     </h3>
+                    <button class="quick-btn" onclick="document.getElementById('gSheetInspectCard').style.display='none'">✕ Close Preview</button>
                 </div>
-
-                <!-- Column Mapping Grid -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1rem; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid var(--border);" id="gSheetColMappingWrap">
-                </div>
-
-                <!-- Preview Table (Cells H19, H20, etc.) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1rem; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid var(--border);" id="gSheetColMappingWrap"></div>
                 <div class="bulk-table-wrap" style="max-height: 280px;">
                     <table class="bulk-table">
                         <thead>
@@ -1325,94 +1415,132 @@
                 </div>
             </div>
 
-            <!-- Lifecycle KPI Counters -->
-            <div class="kpi-row" style="margin-bottom: 1.5rem;">
+            <!-- Enhanced Lifecycle KPI Counters -->
+            <div class="kpi-row" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));">
                 <div class="kpi-card kpi-total">
-                    <div class="m-lbl">Total Sheet AWBs</div>
-                    <div class="m-val" id="kpiSheetTotal">0</div>
-                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 3px; font-weight: 500;">Extracted from Column H</div>
+                    <div class="m-lbl">🎯 Final Tracking List</div>
+                    <div class="m-val" id="kpiSheetActive">0</div>
+                    <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px; font-weight: 600;">Total Undelivered to Track</div>
                 </div>
                 <div class="kpi-card kpi-transit">
-                    <div class="m-lbl">🚚 On The Way (Active)</div>
-                    <div class="m-val" id="kpiSheetActive">0</div>
-                    <div style="font-size: 0.72rem; color: #3b82f6; margin-top: 3px; font-weight: 500;">In-Transit, Departed, Booked</div>
+                    <div class="m-lbl">📄 Undelivered Since Start</div>
+                    <div class="m-val" id="kpiSheetsUndelivered">0</div>
+                    <div style="font-size: 0.72rem; color: #2563eb; margin-top: 3px; font-weight: 600;" id="kpiPerSheetActive">From sheets starting point</div>
                 </div>
-                <div class="kpi-card kpi-success">
-                    <div class="m-lbl">✅ Delivered Archive</div>
-                    <div class="m-val" id="kpiSheetDelivered">0</div>
-                    <div style="font-size: 0.72rem; color: #16a34a; margin-top: 3px; font-weight: 500;">Completed POD (Auto-frozen)</div>
+                <div class="kpi-card kpi-transit" style="border-color: #93c5fd;">
+                    <div class="m-lbl">📥 Added Today (Sheets)</div>
+                    <div class="m-val" id="kpiSheetsNewToday">0</div>
+                    <div style="font-size: 0.72rem; color: #3b82f6; margin-top: 3px; font-weight: 600;" id="kpiPerSheetBreakdown">Added today from sheets</div>
                 </div>
                 <div class="kpi-card kpi-unreachable">
-                    <div class="m-lbl">⚡ Unreachable / Action</div>
-                    <div class="m-val" id="kpiSheetUnreachable">0</div>
-                    <div style="font-size: 0.72rem; color: #d97706; margin-top: 3px; font-weight: 500;">Bot-check or pending sync</div>
+                    <div class="m-lbl">🗄️ Picked from Central Table</div>
+                    <div class="m-val" id="kpiCentralUndelivered">0</div>
+                    <div style="font-size: 0.72rem; color: #d97706; margin-top: 3px; font-weight: 600;">Existing undelivered AWBs</div>
+                </div>
+                <div class="kpi-card kpi-success">
+                    <div class="m-lbl">✅ Delivered Report</div>
+                    <div class="m-val" id="kpiSheetDelivered">0</div>
+                    <div style="font-size: 0.72rem; color: #16a34a; margin-top: 3px; font-weight: 600;" id="kpiDeliveredTodaySub">0 delivered today</div>
                 </div>
             </div>
 
-            <!-- Lifecycle Filter Tabs & Table Card -->
-            <div class="bulk-results-card" style="display: block; margin-bottom: 2rem;">
-                <div class="bulk-toolbar">
-                    <div class="filter-group">
-                        <div class="search-input-wrap">
+            <!-- Filter & Search Bar for the 2 Tables -->
+            <div class="dual-table-card" style="padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
+                <div class="bulk-toolbar" style="margin-bottom: 0;">
+                    <div class="filter-group" style="flex:1; gap: 10px; flex-wrap: wrap;">
+                        <div class="search-input-wrap" style="min-width: 240px;">
                             <span class="search-icon">🔍</span>
-                            <input type="text" id="sheetSearchInput" class="filter-input" placeholder="Filter by customer, AWB, destination, carrier..." oninput="filterSheetTable()" />
+                            <input type="text" id="sheetSearchInput" class="filter-input" placeholder="Search AWB, customer, sheet, tab, carrier..." oninput="filterDualTables()" />
                         </div>
+                        <select id="queueSheetFilter" class="gsheet-select" style="width: 220px;" onchange="refreshMultiSheetQueue()">
+                            <option value="ALL">All Sources (Sheets + Central)</option>
+                            <option value="CENTRAL">Central Table Only</option>
+                        </select>
                     </div>
-                    <div class="bulk-toolbar-right">
-                        <div class="export-actions">
-                            <button class="btn-export-excel" onclick="downloadSheetLifecycleExcel()" title="Download Full Excel (.xlsx)">
-                                <span>📊 Download Excel (.xlsx)</span>
-                            </button>
+                    <div class="bulk-toolbar-right" style="gap: 8px;">
+                        <button class="quick-btn" onclick="refreshMultiSheetQueue()">🔄 Refresh Local Queue (0 API)</button>
+                        <button class="btn-export-excel" onclick="downloadSheetLifecycleExcel()">📊 Export Excel (.xlsx)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLE 1: ACTIVE TRACKING LIST (UNDELIVERED / IN-PROGRESS) -->
+            <div class="dual-table-card">
+                <div class="dual-table-head">
+                    <div>
+                        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span>🎯 Table 1: Active Tracking List (Undelivered)</span>
+                            <span id="badgeActiveQueueCount" style="background: #dbeafe; color: #1e40af; font-size: 0.78rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">0</span>
+                        </h3>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                            New entries from enabled sheets + undelivered AWBs from Central Table. Automatically removed when <strong>DELIVERED</strong>.
                         </div>
                     </div>
                 </div>
-
-                <div class="quick-status-pills" id="sheetLifecyclePills">
-                    <button class="pill-filter active" id="pillSheetAllBtn" onclick="setSheetLifecycleFilter('all')">
-                        <span>All Synchronized</span>
-                        <span class="cnt" id="pillSheetAllCount">0</span>
-                    </button>
-                    <button class="pill-filter" id="pillSheetActiveBtn" onclick="setSheetLifecycleFilter('active')">
-                        <span class="status-dot" style="background:#3b82f6;"></span>
-                        <span>On The Way / Active</span>
-                        <span class="cnt" id="pillSheetActiveCount">0</span>
-                    </button>
-                    <button class="pill-filter" id="pillSheetDeliveredBtn" onclick="setSheetLifecycleFilter('delivered')">
-                        <span class="status-dot" style="background:#10b981;"></span>
-                        <span>Delivered Archive</span>
-                        <span class="cnt" id="pillSheetDeliveredCount">0</span>
-                    </button>
-                </div>
-
-                <!-- Table -->
                 <div class="bulk-table-wrap">
                     <table class="bulk-table">
                         <thead>
                             <tr>
                                 <th style="width: 45px; text-align: center;">#</th>
-                                <th style="width: 170px;">Customer Name</th>
-                                <th style="width: 150px;">AWB No</th>
-                                <th style="width: 95px;">Package</th>
-                                <th style="width: 115px;">Gross Wt</th>
-                                <th style="width: 160px;">IATA / Carrier</th>
-                                <th style="width: 120px;">Flight Code</th>
-                                <th style="width: 110px;">Destination</th>
-                                <th style="width: 175px;">Transition Progress</th>
-                                <th style="width: 130px;">Status of AWB</th>
-                                <th>Latest Milestone Event</th>
-                                <th style="width: 120px;">Last Synced</th>
-                                <th style="width: 80px; text-align: center;">Details</th>
+                                <th style="width: 155px;">Source (Sheet / Central)</th>
+                                <th style="width: 155px;">Customer Name</th>
+                                <th style="width: 140px;">AWB No</th>
+                                <th style="width: 90px;">Pkg / Wt</th>
+                                <th style="width: 145px;">IATA / Carrier</th>
+                                <th style="width: 100px;">Dest</th>
+                                <th style="width: 130px;">Status</th>
+                                <th>Latest Milestone</th>
+                                <th style="width: 120px;">Updated</th>
+                                <th style="width: 70px; text-align: center;">Details</th>
                             </tr>
                         </thead>
-                        <tbody id="sheetLifecycleTableBody">
-                            <tr><td colspan="13" style="text-align: center; padding: 2.5rem; color: #64748b;">
-                                Click <strong>"Inspect Sheet & Preview Cells"</strong> or <strong>"Auto-Track Lifecycle"</strong> above to load shipments.
-                            </td></tr>
+                        <tbody id="activeQueueTableBody">
+                            <tr><td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">Loading active tracking list...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TABLE 2: DELIVERED AWB REPORT (COMPLETED ARCHIVE) -->
+            <div class="dual-table-card" style="border-color: #bbf7d0;">
+                <div class="dual-table-head">
+                    <div>
+                        <h3 style="font-size: 1.05rem; font-weight: 800; color: #14532d; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span>✅ Table 2: Delivered AWB Report (Completed)</span>
+                            <span id="badgeDeliveredReportCount" style="background: #dcfce7; color: #15803d; font-size: 0.78rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">0</span>
+                        </h3>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                            All completed <strong>DELIVERED</strong> shipments moved out of the Active Tracking List (auto-frozen, never re-queried).
+                        </div>
+                    </div>
+                    <a href="/api/v1/ledger/export/csv?status=DELIVERED" class="quick-btn" style="text-decoration:none; border-color:#86efac; color:#15803d; background:#f0fdf4;">⬇️ Download Delivered CSV</a>
+                </div>
+                <div class="bulk-table-wrap">
+                    <table class="bulk-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th style="width: 155px;">Source (Sheet / Central)</th>
+                                <th style="width: 155px;">Customer Name</th>
+                                <th style="width: 140px;">AWB No</th>
+                                <th style="width: 90px;">Pkg / Wt</th>
+                                <th style="width: 145px;">IATA / Carrier</th>
+                                <th style="width: 100px;">Dest</th>
+                                <th style="width: 130px;">Status</th>
+                                <th>Delivery Milestone</th>
+                                <th style="width: 120px;">Delivered At</th>
+                                <th style="width: 70px; text-align: center;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deliveredReportTableBody">
+                            <tr><td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">No delivered shipments yet.</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+            </main>
+        </div><!-- /.workspace-shell -->
 
     <!-- ================= SHIPMENT INSPECTION MODAL ================= -->
     <div class="modal-overlay" id="shipmentModalOverlay" onclick="if(event.target === this) closeModal()">
@@ -1506,7 +1634,7 @@
             if (secSheets) secSheets.style.display = 'none';
 
             if (!skipSave && window.AppState) {
-                AppState.set({ activeDashboardMode: mode });
+                AppState.set({ activeDashboardMode: mode }, { immediate: true });
             }
 
             if (mode === 'bulk') {
@@ -1520,8 +1648,9 @@
             } else if (mode === 'sheets') {
                 if (btnSheets) btnSheets.classList.add('active');
                 if (secSheets) secSheets.style.display = 'block';
-                logTerminal('Switched view to Google Sheets Auto-Tracker.', 'info');
-                loadSheetLifecycle(currentSheetLifecycleFilter || 'all');
+                logTerminal('Switched view to Multi-Sheet Auto-Tracker & 2-Table Queue.', 'info');
+                loadSheetSources();
+                refreshMultiSheetQueue();
                 fetchAutoPilotStatus();
                 ensureAutoPilotPolling();
             } else {
@@ -3344,14 +3473,14 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     gSheetUrl: url,
                     gSheetTab: tab || (tabSelect ? tabSelect.value : 'NOV-26'),
                     gSheetStartRow: startRow !== undefined && startRow !== null ? String(startRow) : '',
-                });
+                }, { immediate: true });
             }
         }
 
         async function inspectGoogleSheet() {
             const url = document.getElementById('gSheetUrlInput')?.value?.trim();
             const col = document.getElementById('gSheetColSelect')?.value || 'H';
-            const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
+            const tab = document.getElementById('newSheetStartTabInput')?.value?.trim() || document.getElementById('gSheetTabSelect')?.value?.trim() || null;
             const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || null;
             const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
             const inspectCard = document.getElementById('gSheetInspectCard');
@@ -3405,7 +3534,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                             gSheetTab: tabSelected,
                             gSheetUrl: url,
                             gSheetCol: targetCol,
-                        });
+                        }, { immediate: true });
                     }
                 }
 
@@ -3491,7 +3620,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
         async function runGoogleSheetSync() {
             const url = document.getElementById('gSheetUrlInput')?.value?.trim();
             const col = document.getElementById('gSheetColSelect')?.value || 'H';
-            const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
+            const tab = document.getElementById('newSheetStartTabInput')?.value?.trim() || document.getElementById('gSheetTabSelect')?.value?.trim() || null;
             const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || null;
             const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
             const syncBtn = document.getElementById('btnGSheetSync');
@@ -3513,7 +3642,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 const resp = await fetch('/api/v1/sheets/sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url, target_col: col, sheet_name: tab, start_row: startRow, scan_all_tabs: scanAll, workers: 5, recheck_delivered: false })
+                    body: JSON.stringify({ url: url, target_col: col, sheet_name: tab, start_row: startRow, scan_all_tabs: scanAll, workers: 1, recheck_delivered: false })
                 });
                 const data = await resp.json();
 
@@ -3542,40 +3671,382 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             }
         }
 
-        async function loadSheetLifecycle(view = 'all') {
-            currentSheetLifecycleFilter = view;
-            try {
-                const resp = await fetch(`/api/v1/sheets/lifecycle?view=${view}`);
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.detail || 'Failed to load lifecycle records');
+        let currentMultiSheetSources = [];
+        let currentActiveQueueData = [];
+        let currentDeliveredReportData = [];
+        let queueAutoRefreshTimer = null;
 
-                currentSheetLifecycleData = data.records || [];
-
-                // Update KPIs
-                if (data.stats) {
-                    const st = data.stats;
-                    const kpiTotal = document.getElementById('kpiSheetTotal');
-                    const kpiActive = document.getElementById('kpiSheetActive');
-                    const kpiDelivered = document.getElementById('kpiSheetDelivered');
-                    const kpiUnreachable = document.getElementById('kpiSheetUnreachable');
-
-                    if (kpiTotal && st.total_records !== undefined) kpiTotal.innerText = st.total_records;
-                    if (kpiActive && st.active_on_the_way !== undefined) kpiActive.innerText = st.active_on_the_way;
-                    if (kpiDelivered && st.delivered !== undefined) kpiDelivered.innerText = st.delivered;
-                    if (kpiUnreachable && st.unreachable !== undefined) kpiUnreachable.innerText = st.unreachable;
-
-                    const pAll = document.getElementById('pillSheetAllCount');
-                    const pAct = document.getElementById('pillSheetActiveCount');
-                    const pDel = document.getElementById('pillSheetDeliveredCount');
-                    if (pAll) pAll.innerText = st.total_records || 0;
-                    if (pAct) pAct.innerText = st.active_on_the_way || 0;
-                    if (pDel) pDel.innerText = st.delivered || 0;
+        function ensureQueueAutoRefresh() {
+            if (queueAutoRefreshTimer) return;
+            queueAutoRefreshTimer = setInterval(() => {
+                const sec = document.getElementById('sheetsTrackerSection');
+                if (sec && sec.style.display !== 'none') {
+                    refreshMultiSheetQueue();
+                    loadSheetSources();
                 }
+            }, 15000); // 15s local SQLite refresh (0 external API calls)
+        }
 
-                renderSheetLifecycleTable();
+        async function loadSheetSources() {
+            try {
+                const resp = await fetch('/api/v1/sheets/sources');
+                const data = await resp.json();
+                if (!resp.ok) return;
+                currentMultiSheetSources = data.sources || [];
+                renderSheetSourcesList();
+                updateQueueSheetFilterDropdown();
             } catch (err) {
-                console.error('Error loading sheet lifecycle:', err);
+                console.error('Error loading sheet sources:', err);
             }
+        }
+
+        function updateQueueSheetFilterDropdown() {
+            const sel = document.getElementById('queueSheetFilter');
+            if (!sel) return;
+            const prevVal = sel.value || 'ALL';
+            sel.innerHTML = '<option value="ALL">All Sources (Sheets + Central)</option><option value="CENTRAL">Central Table Only</option>';
+            currentMultiSheetSources.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.sheet_id;
+                opt.textContent = `📄 ${s.label} (${s.is_enabled ? 'Enabled' : 'Disabled'})`;
+                sel.appendChild(opt);
+            });
+            sel.value = prevVal;
+        }
+
+        function renderSheetSourcesList() {
+            const wrap = document.getElementById('multiSheetSourcesList');
+            const summary = document.getElementById('multiSheetCountSummary');
+            const sbSheets = document.getElementById('sidebarEnabledSheets');
+            if (!wrap) return;
+
+            const enabledCount = currentMultiSheetSources.filter(s => s.is_enabled).length;
+            if (summary) summary.innerText = `${enabledCount} / ${currentMultiSheetSources.length} Enabled`;
+            if (sbSheets) sbSheets.innerText = `${enabledCount} / ${currentMultiSheetSources.length}`;
+
+            if (currentMultiSheetSources.length === 0) {
+                wrap.innerHTML = `<div style="padding: 1rem; text-align: center; color: #64748b; border: 1px dashed var(--border); border-radius: 10px;">
+                    No Google Spreadsheets added yet. Paste a link above and click <strong>➕ Add Sheet</strong>.
+                </div>`;
+                return;
+            }
+
+            wrap.innerHTML = '';
+            currentMultiSheetSources.forEach(s => {
+                const div = document.createElement('div');
+                div.className = `sheet-source-item ${s.is_enabled ? 'enabled' : 'disabled'}`;
+                const tabsCount = (s.known_tabs || []).length;
+                const errHtml = s.last_error ? `<span style="color:#dc2626; font-weight:700;">⚠️ ${s.last_error}</span>` : '';
+                div.innerHTML = `
+                    <div class="sheet-source-meta">
+                        <div class="sheet-source-title">
+                            <span>${s.is_enabled ? '🟢' : '⚪'} ${s.label}</span>
+                            <span class="source-pill">Col ${s.target_col} · Row ${s.start_row}+</span>
+                            <span class="source-pill" style="background:#f0fdf4; color:#15803d; border-color:#bbf7d0;">${s.sheet_name ? `From Tab '${s.sheet_name}' + Future` : (s.scan_all_tabs ? 'All Tabs + New Tabs' : 'Single Tab')}</span>
+                        </div>
+                        <div class="sheet-source-sub">
+                            <span>Rows: <strong>${s.last_row_count || 0}</strong></span>
+                            <span>•</span>
+                            <span>New Today: <strong style="color:#2563eb;">${s.last_new_today || 0}</strong></span>
+                            <span>•</span>
+                            <span>Tabs Detected: <strong>${tabsCount}</strong></span>
+                            <span>•</span>
+                            <span>Last Synced: <strong>${s.last_synced_at || 'Never'}</strong></span>
+                            ${errHtml}
+                        </div>
+                    </div>
+                    <div class="sheet-source-actions">
+                        <button class="quick-btn" onclick="editSheetSource(${s.id})">✏️ Edit</button>
+                        <button class="quick-btn" onclick="inspectSpecificSheet('${s.url.replace(/'/g, "\\'")}', '${s.target_col}', ${s.start_row}, ${s.scan_all_tabs}, '${(s.sheet_name || '').replace(/'/g, "\\'")}')">🔍 Inspect</button>
+                        <button class="quick-btn" style="color:#dc2626; border-color:#fecaca;" onclick="deleteSheetSource(${s.id})">🗑️</button>
+                        <label class="switch" title="${s.is_enabled ? 'Disable Read' : 'Enable Read'}">
+                            <input type="checkbox" ${s.is_enabled ? 'checked' : ''} onchange="toggleSheetSource(${s.id}, this.checked)" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+                wrap.appendChild(div);
+            });
+        }
+
+        function showSheetFeedback(msg, isError = false) {
+            const b = document.getElementById('sheetAddFeedbackBanner');
+            if (!b) return;
+            b.style.display = 'block';
+            b.style.background = isError ? '#fef2f2' : '#ecfdf5';
+            b.style.color = isError ? '#b91c1c' : '#047857';
+            b.style.border = isError ? '1px solid #fecaca' : '1px solid #a7f3d0';
+            b.innerText = msg;
+            setTimeout(() => { if (b) b.style.display = 'none'; }, 6000);
+        }
+
+        function editSheetSource(id) {
+            const s = currentMultiSheetSources.find(x => x.id === id);
+            if (!s) return;
+            document.getElementById('editingSheetSourceId').value = String(s.id);
+            document.getElementById('newSheetLabelInput').value = s.label || '';
+            document.getElementById('gSheetUrlInput').value = s.url || '';
+            document.getElementById('gSheetColSelect').value = s.target_col || 'H';
+            document.getElementById('newSheetStartTabInput').value = s.sheet_name || '';
+            document.getElementById('gSheetStartRowInput').value = s.start_row || 110;
+            document.getElementById('gSheetScanAllTabs').checked = !!s.scan_all_tabs;
+            const btn = document.getElementById('btnAddSheetSource');
+            if (btn) btn.innerText = '💾 Save Sheet';
+            const cBtn = document.getElementById('btnCancelEditSheet');
+            if (cBtn) cBtn.style.display = 'inline-flex';
+        }
+
+        function resetSheetSourceForm() {
+            document.getElementById('editingSheetSourceId').value = '';
+            document.getElementById('newSheetLabelInput').value = '';
+            document.getElementById('gSheetUrlInput').value = '';
+            document.getElementById('gSheetColSelect').value = 'H';
+            document.getElementById('newSheetStartTabInput').value = '';
+            document.getElementById('gSheetStartRowInput').value = '110';
+            document.getElementById('gSheetScanAllTabs').checked = true;
+            const btn = document.getElementById('btnAddSheetSource');
+            if (btn) btn.innerText = '➕ Add Sheet';
+            const cBtn = document.getElementById('btnCancelEditSheet');
+            if (cBtn) cBtn.style.display = 'none';
+        }
+
+        async function addOrUpdateSheetSource() {
+            const sourceIdRaw = (document.getElementById('editingSheetSourceId')?.value || '').trim();
+            const source_id = sourceIdRaw ? parseInt(sourceIdRaw, 10) : null;
+            const url = (document.getElementById('gSheetUrlInput')?.value || '').trim();
+            const label = (document.getElementById('newSheetLabelInput')?.value || '').trim();
+            const target_col = document.getElementById('gSheetColSelect')?.value || 'H';
+            const sheet_name = (document.getElementById('newSheetStartTabInput')?.value || '').trim() || null;
+            const start_row = parseInt(document.getElementById('gSheetStartRowInput')?.value || '110', 10);
+            const scan_all_tabs = document.getElementById('gSheetScanAllTabs')?.checked ?? true;
+
+            if (!url) {
+                showSheetFeedback('Please paste a valid Google Sheet URL.', true);
+                return;
+            }
+            const btn = document.getElementById('btnAddSheetSource');
+            const origTxt = btn ? btn.innerText : '➕ Add Sheet';
+            if (btn) { btn.disabled = true; btn.innerText = '⏳ Saving...'; }
+
+            try {
+                const payload = { url, label: label || undefined, sheet_name, target_col, start_row, scan_all_tabs, is_enabled: true };
+                if (source_id) payload.source_id = source_id;
+
+                const resp = await fetch('/api/v1/sheets/sources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Failed to add sheet');
+
+                showSheetFeedback(`✅ Saved '${data.source.label}' (Col ${data.source.target_col}, Row ${data.source.start_row}+${data.source.sheet_name ? ', From Tab ' + data.source.sheet_name : ''}). Scanning rows...`);
+                logTerminal(`[Multi-Sheet] Saved '${data.source.label}' (Enable Read = ON).`, 'success');
+                resetSheetSourceForm();
+                await loadSheetSources();
+                await scanEnabledSheetsOnly();
+            } catch (err) {
+                showSheetFeedback(`❌ ${err.message}`, true);
+                logTerminal(`[Multi-Sheet Error] ${err.message}`, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = origTxt; }
+            }
+        }
+
+        async function toggleSheetSource(id, isEnabled) {
+            try {
+                const resp = await fetch(`/api/v1/sheets/sources/${id}/toggle`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_enabled: isEnabled }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Toggle failed');
+                logTerminal(`[Multi-Sheet] '${data.source.label}' read ${isEnabled ? 'ENABLED' : 'DISABLED'}.`, 'info');
+                await loadSheetSources();
+                await refreshMultiSheetQueue();
+            } catch (err) {
+                logTerminal(`[Multi-Sheet Toggle Error] ${err.message}`, 'error');
+            }
+        }
+
+        async function deleteSheetSource(id) {
+            if (!confirm('Remove this spreadsheet from the Multi-Sheet list?')) return;
+            try {
+                const resp = await fetch(`/api/v1/sheets/sources/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Delete failed');
+                logTerminal(`[Multi-Sheet] Removed spreadsheet #${id}.`, 'info');
+                await loadSheetSources();
+            } catch (err) {
+                logTerminal(`[Multi-Sheet Delete Error] ${err.message}`, 'error');
+            }
+        }
+
+        async function inspectSpecificSheet(url, col, startRow, scanAll, sheetName) {
+            if (document.getElementById('gSheetUrlInput')) document.getElementById('gSheetUrlInput').value = url;
+            if (document.getElementById('gSheetColSelect')) document.getElementById('gSheetColSelect').value = col || 'H';
+            if (document.getElementById('gSheetStartRowInput')) document.getElementById('gSheetStartRowInput').value = startRow || 110;
+            if (document.getElementById('newSheetStartTabInput')) document.getElementById('newSheetStartTabInput').value = sheetName || '';
+            if (document.getElementById('gSheetScanAllTabs')) document.getElementById('gSheetScanAllTabs').checked = !!scanAll;
+            await inspectGoogleSheet();
+        }
+
+        async function scanEnabledSheetsOnly() {
+            const btn = document.getElementById('btnScanEnabledSheets');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Scanning Enabled Sheets...'; }
+            logTerminal('[Multi-Sheet] Scanning all enabled spreadsheets for new rows & new tabs (0 airline hits)...', 'info');
+            try {
+                const resp = await fetch('/api/v1/sheets/sources/scan-only', { method: 'POST' });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Scan failed');
+                const ss = data.scan_summary || {};
+                logTerminal(`[Multi-Sheet] Scanned ${ss.enabled_count || 0} enabled sheets: ${ss.total_new_awbs || 0} new AWBs added to Active Queue.`, 'success');
+                if (ss.new_tabs_detected && ss.new_tabs_detected.length > 0) {
+                    logTerminal(`[New Tabs Detected] ${JSON.stringify(ss.new_tabs_detected)}`, 'info');
+                }
+                applyQueueAndKpiPayload(data);
+                await loadSheetSources();
+            } catch (err) {
+                logTerminal(`[Multi-Sheet Scan Error] ${err.message}`, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            }
+        }
+
+        async function syncAndTrackEnabledSheets() {
+            const btn = document.getElementById('btnGSheetSync');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Tracking Final Queue...'; }
+            logTerminal('[Multi-Sheet] Scanning enabled sheets + tracking all undelivered AWBs (Sheets + Central)...', 'info');
+            try {
+                const resp = await fetch('/api/v1/sheets/sources/sync-track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workers: 1 }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Sync & Track failed');
+                logTerminal(`[Multi-Sheet Track] Tracked ${data.newly_tracked_count || 0} AWBs | Newly Delivered: ${data.newly_delivered_count || 0}.`, 'success');
+                applyQueueAndKpiPayload(data);
+                await loadSheetSources();
+                await loadMasterLedger();
+            } catch (err) {
+                logTerminal(`[Multi-Sheet Track Error] ${err.message}`, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            }
+        }
+
+        async function refreshMultiSheetQueue() {
+            ensureQueueAutoRefresh();
+            try {
+                const sheetFilter = document.getElementById('queueSheetFilter')?.value || 'ALL';
+                const resp = await fetch(`/api/v1/sheets/queue?sheet_filter=${encodeURIComponent(sheetFilter)}`);
+                const data = await resp.json();
+                if (!resp.ok) return;
+                applyQueueAndKpiPayload(data);
+            } catch (err) {
+                console.error('Error refreshing dual-table queue:', err);
+            }
+        }
+
+        function applyQueueAndKpiPayload(data) {
+            currentActiveQueueData = data.active_queue || [];
+            currentDeliveredReportData = data.delivered_report || [];
+            const k = data.kpis || {};
+
+            const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+            setTxt('kpiSheetActive', k.total_active_queue ?? currentActiveQueueData.length);
+            setTxt('kpiSheetsUndelivered', k.undelivered_from_sheets ?? 0);
+            setTxt('kpiSheetsNewToday', k.added_from_sheets_today ?? 0);
+            setTxt('kpiCentralUndelivered', k.picked_from_central_undelivered ?? 0);
+            setTxt('kpiSheetDelivered', k.total_delivered ?? currentDeliveredReportData.length);
+            setTxt('kpiDeliveredTodaySub', `${k.delivered_today ?? 0} delivered today`);
+
+            const perSheetActive = (k.per_sheet || []).map(p => `${p.label}: ${p.active_count}`).join(' · ');
+            setTxt('kpiPerSheetActive', perSheetActive || 'From sheets starting point');
+
+            const perSheet = (k.per_sheet || []).map(p => `${p.label}: +${p.new_today_count}`).join(' · ');
+            setTxt('kpiPerSheetBreakdown', perSheet || 'Added today from sheets');
+
+            setTxt('navSheetsActiveBadge', k.total_active_queue ?? currentActiveQueueData.length);
+            setTxt('sidebarActiveQueue', k.total_active_queue ?? currentActiveQueueData.length);
+            setTxt('sidebarDeliveredCount', k.total_delivered ?? currentDeliveredReportData.length);
+
+            renderDualTables();
+        }
+
+        function filterDualTables() {
+            renderDualTables();
+        }
+
+        function renderDualTables() {
+            const q = (document.getElementById('sheetSearchInput')?.value || '').toLowerCase().trim();
+            const matchFn = (r) => {
+                if (!q) return true;
+                const txt = `${r.customer_name || ''} ${r.awb_no || ''} ${r.destination || ''} ${r.carrier_name || ''} ${r.status || ''} ${r.source_sheet_label || ''} ${r.source_tab || ''}`.toLowerCase();
+                return txt.includes(q);
+            };
+
+            const activeFiltered = currentActiveQueueData.filter(matchFn);
+            const deliveredFiltered = currentDeliveredReportData.filter(matchFn);
+
+            const bAct = document.getElementById('badgeActiveQueueCount');
+            const bDel = document.getElementById('badgeDeliveredReportCount');
+            if (bAct) bAct.innerText = activeFiltered.length;
+            if (bDel) bDel.innerText = deliveredFiltered.length;
+
+            renderQueueTableRows('activeQueueTableBody', activeFiltered, 'No active undelivered AWBs in tracking list.');
+            renderQueueTableRows('deliveredReportTableBody', deliveredFiltered, 'No delivered AWBs in report yet.');
+        }
+
+        function renderQueueTableRows(tbodyId, rows, emptyMsg) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!rows || rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">${emptyMsg}</td></tr>`;
+                return;
+            }
+            rows.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                let statusBadge = `<span class="badge-status bs-transit"><span class="status-dot"></span>${r.status || 'PENDING'}</span>`;
+                if (r.status === 'DELIVERED') statusBadge = `<span class="badge-status bs-delivered"><span class="status-dot"></span>Delivered</span>`;
+                else if (r.status === 'DEPARTED') statusBadge = `<span class="badge-status bs-departed"><span class="status-dot"></span>Departed</span>`;
+                else if (r.status === 'ARRIVED') statusBadge = `<span class="badge-status bs-arrived"><span class="status-dot"></span>Arrived</span>`;
+                else if (r.status === 'UNREACHABLE') statusBadge = `<span class="badge-status bs-unreachable"><span class="status-dot"></span>Unreachable</span>`;
+                else if (r.status === 'NOT_FOUND') statusBadge = `<span class="badge-status bs-notfound"><span class="status-dot"></span>Not Found</span>`;
+                else if (r.status === 'PENDING') statusBadge = `<span class="badge-status bs-skipped"><span class="status-dot"></span>Queued</span>`;
+
+                const sourceHtml = r.source_sheet_id
+                    ? `<span class="source-pill" title="${r.source_sheet_label || ''} (${r.source_tab || ''} ${r.source_cell || ''})">📄 ${(r.source_sheet_label || 'Sheet').slice(0, 16)} · ${r.source_tab || ''}</span>`
+                    : `<span class="source-pill central">🗄️ Central Table</span>`;
+
+                const pkgWt = `${r.package_display || '---'} / ${r.gross_weight || '---'}`;
+                const shortName = (typeof getShortCarrierName === 'function') ? getShortCarrierName(r.carrier_name, r.iata_prefix) : (r.carrier_name || r.iata_prefix || 'Pending');
+
+                tr.innerHTML = `
+                    <td style="text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
+                    <td>${sourceHtml}</td>
+                    <td><strong style="color: #0f172a;">${r.customer_name || '---'}</strong></td>
+                    <td><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #1e40af;">${r.awb_no || r.awb_clean}</span></td>
+                    <td style="font-size: 0.78rem; color: #475569;">${pkgWt}</td>
+                    <td><span style="font-weight: 700; font-size: 0.8rem;">${shortName}</span></td>
+                    <td><span style="font-weight: 700;">${r.destination || '---'}</span></td>
+                    <td>${statusBadge}</td>
+                    <td><div class="msg-clamp" title="${r.latest_activity || r.status_detail || ''}">${r.latest_activity || r.status_detail || '---'}</div></td>
+                    <td style="font-size: 0.74rem; color: #64748b;">${(r.last_updated_at || '').slice(0, 16)}</td>
+                    <td style="text-align: center;">
+                        <button class="quick-btn" onclick="openLedgerModal('${r.awb_clean}')">View</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadSheetLifecycle(view = 'all') {
+            await refreshMultiSheetQueue();
         }
 
         function setSheetLifecycleFilter(view) {
@@ -3718,9 +4189,9 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             const tab = document.getElementById('gSheetTabSelect')?.value?.trim() || null;
             const startRow = parseInt(document.getElementById('gSheetStartRowInput')?.value) || 110;
             const scanAll = document.getElementById('gSheetScanAllTabs')?.checked || false;
-            const interval = parseInt(document.getElementById('autoPilotIntervalSelect')?.value) || 30;
+            const interval = parseInt(document.getElementById('autoPilotIntervalSelect')?.value) || 60;
 
-            logTerminal(`[Auto-Pilot] Starting background lifecycle daemon (every ${interval} mins, Start Row: ${startRow})...`, 'info');
+            logTerminal(`[Auto-Pilot] Starting background lifecycle daemon (every ${interval} mins, Start Row: ${startRow}, Ultra-Safe Pace)...`, 'info');
 
             try {
                 const resp = await fetch('/api/v1/sheets/autopilot/start', {
@@ -3732,7 +4203,8 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                         sheet_name: tab,
                         start_row: startRow,
                         scan_all_tabs: scanAll,
-                        interval_minutes: interval
+                        interval_minutes: interval,
+                        workers: 1
                     })
                 });
                 const data = await resp.json();
@@ -3800,6 +4272,8 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             }
         }
 
+        let lastKnownAutoPilotCycles = null;
+
         async function fetchAutoPilotStatus() {
             try {
                 const resp = await fetch('/api/v1/sheets/autopilot/status');
@@ -3808,6 +4282,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
 
                 const isRunning = data.is_running;
                 const isCycling = data.stats && data.stats.is_cycling;
+                const totalCycles = data.stats?.total_cycles || 0;
                 const toggle = document.getElementById('autoPilotToggleCheckbox');
                 const badge = document.getElementById('autoPilotStatusBadge');
                 const txt = document.getElementById('autoPilotStatusText');
@@ -3815,6 +4290,14 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 const countdown = document.getElementById('autoPilotCountdown');
                 const cycles = document.getElementById('autoPilotCycleCount');
                 const runBtn = document.getElementById('btnAutoPilotRunNow');
+
+                // Auto-refresh UI tables when a background cycle or Smart Sheet Watcher sync completes
+                if (lastKnownAutoPilotCycles !== null && totalCycles > lastKnownAutoPilotCycles) {
+                    logTerminal(`[Auto-Pilot] Background sync #${totalCycles} finished. Refreshing live tables...`, 'success');
+                    await loadSheetLifecycle(currentSheetLifecycleFilter || 'all');
+                    await loadMasterLedger();
+                }
+                lastKnownAutoPilotCycles = totalCycles;
 
                 if (toggle) toggle.checked = isRunning;
                 if (lbl) lbl.innerText = isRunning ? 'Auto-Pilot is ON' : 'Auto-Pilot is OFF';
@@ -3839,14 +4322,19 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                         txt.innerText = '⚡ CYCLE IN PROGRESS';
                     } else if (isRunning) {
                         badge.className = 'badge-status bs-delivered';
-                        txt.innerText = `RUNNING (Every ${data.config?.interval_minutes || 30}m)`;
+                        txt.innerText = `RUNNING (Every ${data.config?.interval_minutes || 60}m + 5m Sheet Watch)`;
                     } else {
                         badge.className = 'badge-status bs-skipped';
                         txt.innerText = 'PAUSED / OFF';
                     }
                 }
+                const sbAp = document.getElementById('sidebarAutoPilotState');
+                if (sbAp) {
+                    sbAp.innerText = isCycling ? 'SYNCING' : (isRunning ? 'ON' : 'OFF');
+                    sbAp.style.color = isRunning ? '#16a34a' : '#64748b';
+                }
 
-                if (cycles) cycles.innerText = data.stats?.total_cycles || 0;
+                if (cycles) cycles.innerText = totalCycles;
 
                 if (countdown) {
                     if (isCycling) {
@@ -3935,7 +4423,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 singleCarrierSelect: 'auto',
                 bulkActiveSubTab: 'paste',
                 bulkTextarea: '',
-                bulkWorkersSelect: '5',
+                bulkWorkersSelect: '1',
                 bulkSearchInput: '',
                 ledgerSearchInput: '',
                 gSheetUrl: 'https://docs.google.com/spreadsheets/d/1-4HOJ7A8eydJOR6Gyci_7HvZWhl-vAGumqjItwSIriw/edit?usp=sharing',
@@ -3945,7 +4433,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 gSheetStartRow: '110',
                 gSheetScanAllTabs: false,
                 sheetLifecycleFilter: 'all',
-                autoPilotInterval: '30',
+                autoPilotInterval: '60',
             },
 
             loadLocal() {
@@ -3977,7 +4465,12 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                 this.state = { ...this.state, ...patch };
                 this.saveLocal();
                 if (!options.silent) {
-                    this.syncToServerDebounced();
+                    if (options.immediate) {
+                        if (this._syncTimer) clearTimeout(this._syncTimer);
+                        this.syncToServerNow();
+                    } else {
+                        this.syncToServerDebounced();
+                    }
                 }
             },
 
@@ -4101,7 +4594,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
                     const el = document.getElementById(id);
                     if (!el) return;
                     el.addEventListener(eventName, () => {
-                        this.set({ [stateKey]: transform(el) });
+                        this.set({ [stateKey]: transform(el) }, { immediate: eventName === 'change' });
                     });
                 };
 
@@ -4155,6 +4648,8 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             await AppState.init();
             fetchAutoPilotStatus();
             loadProxyStatus();
+            loadSheetSources();
+            refreshMultiSheetQueue();
         });
 
 

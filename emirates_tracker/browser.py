@@ -64,23 +64,8 @@ class EmiratesBrowserTracker:
 
         intercepted_order_details: Optional[Dict[str, Any]] = None
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1440, "height": 900},
-            )
-            page = context.new_page()
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=timeout_ms) as (page, context, browser):
 
             # Intercept order details JSON from Emirates SkyCargo API
             def handle_response(response):
@@ -232,8 +217,6 @@ class EmiratesBrowserTracker:
                 os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                 page.screenshot(path=screenshot_path, full_page=True)
                 logger.info(f"Saved details screenshot to {screenshot_path}")
-
-            browser.close()
 
             # Construct or retrieve tracking result
             # Using client for 100% structured data fidelity

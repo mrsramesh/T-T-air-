@@ -76,11 +76,12 @@ class GoogleSheetsTracker:
             return clean
         raise ValueError(f"Invalid Google Sheet URL or ID: '{url_or_id}'. Expected standard Google Docs spreadsheet link.")
 
-    def fetch_workbook(self, sheet_id: str, bypass_cache: bool = False) -> openpyxl.Workbook:
+    def fetch_workbook(self, sheet_id: str, bypass_cache: bool = True) -> openpyxl.Workbook:
         """
-        Downloads Google Sheet via XLSX export and loads into openpyxl Workbook.
-        Features anti-429 exponential backoff, rotating User-Agent, in-memory caching,
-        and proxy support.
+        Downloads live Google Sheet via XLSX export and loads into openpyxl Workbook.
+        Always fetches fresh data by default (with cache-busting query param and no-cache headers)
+        so edits in Google Sheet appear immediately. In-memory cache is used ONLY as an
+        offline/429 fallback if Google cannot be reached.
         """
         now = time.time()
         if not bypass_cache and sheet_id in self._cache:
@@ -89,49 +90,44 @@ class GoogleSheetsTracker:
                 logger.debug(f"[GoogleSheets] Returning cached workbook for {sheet_id} ({int(now - ts)}s old)")
                 return openpyxl.load_workbook(io.BytesIO(cached_bytes), data_only=True)
 
-        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+        # Cache-buster query param + no-cache headers prevent Google CDN from serving stale XLSX
+        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx&_cb={int(now)}"
         headers = StealthEngine.get_stealth_headers(referer="https://docs.google.com/")
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        headers["Pragma"] = "no-cache"
 
         max_attempts = 3
         last_error = None
 
         for attempt in range(max_attempts):
             try:
-                proxy_str = proxy_pool.get_proxy()
-                opener = urllib.request.build_opener()
-                if proxy_str:
-                    proxy_handler = urllib.request.ProxyHandler({"http": proxy_str, "https": proxy_str})
-                    opener = urllib.request.build_opener(proxy_handler)
-
-                req = urllib.request.Request(export_url, headers=headers)
-                with opener.open(req, timeout=self.timeout_sec) as response:
-                    content = response.read()
-                    if not content or len(content) < 500:
-                        raise GoogleSheetError("Downloaded spreadsheet payload is empty or corrupted.")
-
-                    # Cache successful download
-                    self._cache[sheet_id] = (time.time(), content)
-                    if proxy_str:
-                        proxy_pool.report_success(proxy_str)
-                    return openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-
-            except urllib.error.HTTPError as he:
-                last_error = he
-                if he.code in (401, 403):
+                import requests as req_lib
+                resp = req_lib.get(export_url, headers=headers, timeout=self.timeout_sec)
+                if resp.status_code in (401, 403):
                     raise GoogleSheetAccessError(
-                        f"Google Sheet access is restricted (HTTP {he.code} Unauthorized). "
+                        f"Google Sheet access is restricted (HTTP {resp.status_code} Unauthorized). "
                         "Please open the sheet in Google Drive -> click 'Share' at the top right -> "
                         "under 'General access', change from 'Restricted' to 'Anyone with the link can view' (or Editor), then retry."
                     )
-                elif he.code == 404:
+                elif resp.status_code == 404:
                     raise GoogleSheetNotFoundError(f"Google Sheet not found (HTTP 404). Please verify the spreadsheet ID: '{sheet_id}'.")
-                elif he.code == 429:
+                elif resp.status_code == 429:
                     wait_time = (2 ** attempt) + 1.0
                     logger.warning(f"[GoogleSheets] HTTP 429 Rate Limit from Google. Backing off {wait_time}s (attempt {attempt + 1}/{max_attempts})...")
                     time.sleep(wait_time)
-                else:
-                    logger.warning(f"[GoogleSheets] HTTP Error {he.code}: {he.reason}")
-                    time.sleep(1.0)
+                    continue
+                elif resp.status_code >= 400:
+                    raise GoogleSheetError(f"Failed to fetch Google Sheet: HTTP {resp.status_code} {resp.reason}")
+
+                content = resp.content
+                if not content or len(content) < 500:
+                    raise GoogleSheetError("Downloaded spreadsheet payload is empty or corrupted.")
+
+                self._cache[sheet_id] = (time.time(), content)
+                return openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+
+            except (GoogleSheetAccessError, GoogleSheetNotFoundError):
+                raise
             except Exception as e:
                 last_error = e
                 logger.warning(f"[GoogleSheets] Network error on attempt {attempt + 1}: {e}")
@@ -228,6 +224,33 @@ class GoogleSheetsTracker:
 
         return best_header_row, col_map
 
+    @staticmethod
+    def _resolve_tabs_to_scan(
+        wb: Any,
+        sheet_name: Optional[str],
+        scan_all_tabs: bool,
+        selected_sheet_name: str,
+    ) -> List[str]:
+        """Returns ordered list of tabs to scan, respecting starting tab when scan_all_tabs=True."""
+        all_tabs = list(wb.sheetnames)
+        if not (scan_all_tabs or sheet_name in ("ALL", "all", "*")):
+            return [selected_sheet_name]
+        if sheet_name and sheet_name not in ("ALL", "all", "*"):
+            target_norm = re.sub(r"[^a-z0-9]", "", sheet_name.strip().lower())
+            for idx_t, t_name in enumerate(all_tabs):
+                if t_name.strip().lower() == sheet_name.strip().lower() or re.sub(r"[^a-z0-9]", "", t_name.strip().lower()) == target_norm:
+                    return all_tabs[idx_t:]
+        return all_tabs
+
+    @staticmethod
+    def _find_matching_tab(all_tabs: List[str], sheet_name: Optional[str]) -> str:
+        if sheet_name:
+            target_norm = re.sub(r"[^a-z0-9]", "", sheet_name.strip().lower())
+            for t in all_tabs:
+                if t.strip().lower() == sheet_name.strip().lower() or re.sub(r"[^a-z0-9]", "", t.strip().lower()) == target_norm:
+                    return t
+        return all_tabs[-1]
+
     def inspect_sheet(
         self,
         url_or_id: str,
@@ -238,13 +261,13 @@ class GoogleSheetsTracker:
     ) -> Dict[str, Any]:
         """
         Inspects Google Sheet structure: tabs, detected columns, and previews AWBs.
-        Supports start_row (e.g. 110 for H110 downwards) and scan_all_tabs.
+        Supports start_row (e.g. 110 for H110 downwards), starting tab, and scan_all_tabs.
         """
         sheet_id = self.parse_sheet_id(url_or_id)
         wb = self.fetch_workbook(sheet_id)
 
         all_tabs = wb.sheetnames
-        selected_sheet_name = sheet_name if (sheet_name and sheet_name in all_tabs) else all_tabs[-1]
+        selected_sheet_name = self._find_matching_tab(all_tabs, sheet_name)
         sheet = wb[selected_sheet_name]
 
         header_row, col_map = self._auto_detect_columns(sheet)
@@ -269,13 +292,16 @@ class GoogleSheetsTracker:
         records = []
         carrier_counts: Dict[str, int] = {}
 
-        tabs_to_scan = all_tabs if (scan_all_tabs or sheet_name in ("ALL", "all", "*")) else [selected_sheet_name]
+        tabs_to_scan = self._resolve_tabs_to_scan(wb, sheet_name, scan_all_tabs, selected_sheet_name)
 
-        for tab in tabs_to_scan:
+        for tab_pos, tab in enumerate(tabs_to_scan):
             curr_sheet = wb[tab]
             curr_h_row, curr_cmap = self._auto_detect_columns(curr_sheet)
             c_awb_idx = self._col_letter_to_index(target_col) if target_col else curr_cmap["awb"]
-            c_start = int(start_row) if (start_row and int(start_row) > 0) else (curr_h_row + 1)
+            if start_row and int(start_row) > 0 and (tab_pos == 0 or not sheet_name or sheet_name in ("ALL", "all", "*")):
+                c_start = int(start_row)
+            else:
+                c_start = curr_h_row + 1
 
             for r in range(c_start, curr_sheet.max_row + 1):
                 val = str(curr_sheet.cell(row=r, column=c_awb_idx).value or "").strip()
@@ -334,7 +360,7 @@ class GoogleSheetsTracker:
             "total_sheet_rows": sheet.max_row,
             "valid_awbs_found": len(records),
             "carrier_distribution": carrier_counts,
-            "preview_records": records[:30],
+            "preview_records": records[:1000],
         }
 
     def extract_awb_manifest(
@@ -359,13 +385,27 @@ class GoogleSheetsTracker:
         wb = self.fetch_workbook(info["sheet_id"])
 
         tabs_to_scan = wb.sheetnames if (scan_all_tabs or sheet_name in ("ALL", "all", "*")) else [info["selected_tab"]]
+        start_tab_idx = 0
+        if scan_all_tabs and sheet_name and sheet_name not in ("ALL", "all", "*"):
+            target_norm = re.sub(r"[^a-z0-9]", "", sheet_name.strip().lower())
+            for idx_t, t_name in enumerate(wb.sheetnames):
+                if t_name.strip().lower() == sheet_name.strip().lower() or re.sub(r"[^a-z0-9]", "", t_name.strip().lower()) == target_norm:
+                    start_tab_idx = idx_t
+                    break
+            tabs_to_scan = wb.sheetnames[start_tab_idx:]
+
         items = []
 
-        for tab in tabs_to_scan:
+        for tab_pos, tab in enumerate(tabs_to_scan):
             sheet = wb[tab]
             header_row, col_map = self._auto_detect_columns(sheet)
             awb_col_idx = self._col_letter_to_index(target_col) if target_col else col_map["awb"]
-            c_start = int(start_row) if (start_row and int(start_row) > 0) else (header_row + 1)
+            # Apply start_row to the starting tab (or all tabs if no specific starting tab was given);
+            # future tabs added AFTER the starting tab are scanned from header_row + 1 downwards.
+            if start_row and int(start_row) > 0 and (tab_pos == 0 or not sheet_name or sheet_name in ("ALL", "all", "*")):
+                c_start = int(start_row)
+            else:
+                c_start = header_row + 1
 
             for r in range(c_start, sheet.max_row + 1):
                 val = str(sheet.cell(row=r, column=awb_col_idx).value or "").strip()
@@ -446,6 +486,15 @@ class GoogleSheetsTracker:
         already_delivered_records: List[Dict[str, Any]] = []
 
         for item in manifest:
+            # Always sync latest Google Sheet metadata (customer, dest, pieces, weight) into existing DB records
+            self.ledger.sync_sheet_metadata(
+                clean_awb=item["clean_awb"],
+                customer_name=item.get("customer_name"),
+                destination=item.get("destination"),
+                pkg_pieces=item.get("pkg_pieces"),
+                gross_weight=item.get("gross_weight"),
+            )
+
             existing = self.ledger.get_record_by_awb(item["clean_awb"])
             is_recycled = self.ledger.is_record_stale_or_recycled(
                 existing, max_delivery_age_days=60, current_tab_month=sheet_name
@@ -504,9 +553,229 @@ class GoogleSheetsTracker:
             "total_sheet_awbs": total_items,
             "already_delivered_skipped": len(already_delivered_records),
             "newly_tracked_count": len(tracked_records),
+            "active_tracked_count": len(tracked_records),
             "active_on_the_way_count": len(active_on_the_way),
             "delivered_count": len(delivered_archive),
             "active_shipments": active_on_the_way,
             "delivered_shipments": delivered_archive,
             "all_records": sheet_records,
+        }
+
+    def compute_manifest_signature(
+        self,
+        url_or_id: str,
+        sheet_name: Optional[str] = None,
+        target_col: str = "H",
+        start_row: Optional[int] = None,
+        scan_all_tabs: bool = False,
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Fetches live Google Sheet and computes a deterministic SHA-256 signature of all rows.
+        Used by AutoPilot's Smart Sheet Watcher to detect sheet edits with ZERO airline API calls.
+        """
+        import hashlib
+        import json
+
+        sheet_id = self.parse_sheet_id(url_or_id)
+        manifest = self.extract_awb_manifest(
+            sheet_id,
+            sheet_name=sheet_name,
+            target_col=target_col,
+            start_row=start_row,
+            scan_all_tabs=scan_all_tabs,
+        )
+        canonical = [
+            (
+                i.get("tab"),
+                i.get("row"),
+                i.get("clean_awb"),
+                i.get("customer_name"),
+                i.get("destination"),
+                str(i.get("pkg_pieces")),
+                str(i.get("gross_weight")),
+            )
+            for i in manifest
+        ]
+        sig = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode("utf-8")).hexdigest()
+        return sig, manifest
+
+    def _compute_manifest_sig_only(self, manifest: List[Dict[str, Any]], tabs: List[str]) -> str:
+        import hashlib
+        import json
+        canonical = {
+            "tabs": sorted(tabs),
+            "rows": [
+                (
+                    i.get("tab"),
+                    i.get("row"),
+                    i.get("clean_awb"),
+                    i.get("customer_name"),
+                    i.get("destination"),
+                    str(i.get("pkg_pieces")),
+                    str(i.get("gross_weight")),
+                )
+                for i in manifest
+            ],
+        }
+        return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode("utf-8")).hexdigest()
+
+    def scan_enabled_sheets(self) -> Dict[str, Any]:
+        """
+        Reads all ENABLED Google Sheets from `sheet_sources`, detects new tabs & new rows
+        after each sheet's start_row, and registers any new AWBs into `master_awb_ledger`
+        with ZERO airline API calls.
+        """
+        enabled_sheets = self.ledger.list_sheet_sources(enabled_only=True)
+        total_new_awbs = 0
+        new_tabs_detected: List[Dict[str, Any]] = []
+        changed_sheets: List[str] = []
+        sheet_summaries: List[Dict[str, Any]] = []
+
+        for src in enabled_sheets:
+            sid = src["id"]
+            label = src["label"]
+            try:
+                info = self.inspect_sheet(
+                    src["url"],
+                    sheet_name=src.get("sheet_name"),
+                    target_col=src.get("target_col") or "H",
+                    start_row=src.get("start_row") or 110,
+                    scan_all_tabs=bool(src.get("scan_all_tabs", True)),
+                )
+                all_tabs = info.get("all_tabs") or info.get("tabs") or []
+                prev_tabs = set(src.get("known_tabs") or [])
+                added_tabs = [t for t in all_tabs if t not in prev_tabs] if prev_tabs else []
+
+                manifest = self.extract_awb_manifest(
+                    src["url"],
+                    sheet_name=src.get("sheet_name"),
+                    target_col=src.get("target_col") or "H",
+                    start_row=src.get("start_row") or 110,
+                    scan_all_tabs=bool(src.get("scan_all_tabs", True)),
+                )
+
+                new_in_sheet = 0
+                for item in manifest:
+                    is_new = self.ledger.register_sheet_awb_stub(
+                        clean_awb=item["clean_awb"],
+                        formatted_awb=item["formatted_awb"],
+                        customer_name=item.get("customer_name"),
+                        destination=item.get("destination"),
+                        pkg_pieces=item.get("pkg_pieces"),
+                        gross_weight=item.get("gross_weight"),
+                        source_sheet_id=src["sheet_id"],
+                        source_sheet_label=label,
+                        source_tab=item.get("tab"),
+                        source_cell=item.get("cell"),
+                    )
+                    if is_new:
+                        new_in_sheet += 1
+
+                total_new_awbs += new_in_sheet
+                self.ledger.prune_stale_sheet_stubs(
+                    source_sheet_id=src["sheet_id"],
+                    valid_clean_awbs=[i["clean_awb"] for i in manifest],
+                )
+                new_sig = self._compute_manifest_sig_only(manifest, all_tabs)
+                has_changed = bool(src.get("last_signature") and new_sig != src.get("last_signature"))
+                if has_changed or added_tabs or new_in_sheet > 0:
+                    changed_sheets.append(label)
+
+                if added_tabs:
+                    new_tabs_detected.append({"sheet": label, "tabs": added_tabs})
+
+                self.ledger.update_sheet_source_sync_state(
+                    source_id=sid,
+                    last_signature=new_sig,
+                    known_tabs=all_tabs,
+                    last_row_count=len(manifest),
+                    last_new_today=new_in_sheet,
+                    synced=True,
+                    last_error=None,
+                )
+                sheet_summaries.append({
+                    "id": sid,
+                    "label": label,
+                    "sheet_id": src["sheet_id"],
+                    "rows_found": len(manifest),
+                    "new_awbs": new_in_sheet,
+                    "tabs_count": len(all_tabs),
+                    "added_tabs": added_tabs,
+                    "changed": has_changed,
+                    "error": None,
+                })
+            except Exception as e:
+                err = str(e)
+                logger.warning(f"[MultiSheet] Error scanning '{label}': {err}")
+                self.ledger.update_sheet_source_sync_state(source_id=sid, last_error=err)
+                sheet_summaries.append({
+                    "id": sid,
+                    "label": label,
+                    "sheet_id": src["sheet_id"],
+                    "rows_found": 0,
+                    "new_awbs": 0,
+                    "tabs_count": 0,
+                    "added_tabs": [],
+                    "changed": False,
+                    "error": err,
+                })
+
+        return {
+            "enabled_count": len(enabled_sheets),
+            "total_new_awbs": total_new_awbs,
+            "changed_sheets": changed_sheets,
+            "new_tabs_detected": new_tabs_detected,
+            "sheets": sheet_summaries,
+        }
+
+    def sync_all_enabled_sheets(
+        self,
+        workers: int = 1,
+        track_live: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        1. Scans all enabled Google Sheets (registering new entries after start_row & new tabs).
+        2. Collects the unified Final Active Tracking List (new from sheets + undelivered from central ledger).
+        3. If track_live=True, tracks all undelivered AWBs via BulkCargoTracker and moves DELIVERED ones
+           out of the Active Tracking List into the Delivered Report.
+        """
+        t0 = time.time()
+        scan_res = self.scan_enabled_sheets()
+
+        newly_tracked = 0
+        newly_delivered = 0
+
+        if track_live:
+            active_records = self.ledger.get_active_shipments(limit=5000)
+            # Exclude SKIPPED (unsupported carrier prefix) from repeated airline hits
+            to_track = [
+                r for r in active_records
+                if (r.get("status") or "").upper() not in ("DELIVERED", "SKIPPED")
+            ]
+            if to_track:
+                awb_list = [r.get("awb_no") or r.get("awb_clean") for r in to_track]
+                tracker = BulkCargoTracker(max_global_workers=workers)
+                bulk_summary = tracker.track_batch(awb_list)
+                for rec in bulk_summary.records:
+                    upserted = self.ledger.upsert_record(rec)
+                    newly_tracked += 1
+                    if upserted.get("status") == "DELIVERED":
+                        newly_delivered += 1
+
+        queue_data = self.ledger.get_tracking_queue_and_kpis()
+        elapsed = round(time.time() - t0, 2)
+
+        return {
+            "status": "success",
+            "execution_time_sec": elapsed,
+            "scan_summary": scan_res,
+            "newly_tracked_count": newly_tracked,
+            "newly_delivered_count": newly_delivered,
+            "total_sheet_awbs": sum(s.get("rows_found", 0) for s in scan_res.get("sheets", [])),
+            "active_tracked_count": newly_tracked,
+            "already_delivered_skipped": queue_data["kpis"]["total_delivered"],
+            "delivered_count": newly_delivered,
+            "kpis": queue_data["kpis"],
+            "active_queue": queue_data["active_queue"],
+            "delivered_report": queue_data["delivered_report"],
         }

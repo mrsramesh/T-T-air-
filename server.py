@@ -49,7 +49,7 @@ from bulk_tracker.google_sheets import (
     GoogleSheetError,
 )
 from bulk_tracker.autopilot import AutoPilotManager
-from bulk_tracker.proxy_pool import proxy_pool
+from bulk_tracker.proxy_pool import proxy_pool, install_requests_proxy_hook
 from bulk_tracker.circuit_breaker import circuit_breaker
 from bulk_tracker.notifier import notifier
 
@@ -71,6 +71,8 @@ def on_app_startup():
     if isinstance(saved_proxy, dict) and saved_proxy.get("mode"):
         proxy_pool.set_mode(saved_proxy["mode"], saved_proxy.get("custom_proxies"))
         print(f"[Startup] Restored persisted Proxy Mode: {saved_proxy['mode']}")
+
+    install_requests_proxy_hook()
 
     resumed = autopilot.resume_from_storage()
     if resumed:
@@ -103,7 +105,7 @@ indigo_client = IndigoCargoClient()
 turkish_client = TurkishCargoClient()
 etihad_client = EtihadCargoClient()
 saudia_client = SaudiaCargoClient()
-bulk_tracker = BulkCargoTracker(max_global_workers=8)
+bulk_tracker = BulkCargoTracker(max_global_workers=2)
 
 
 class BatchTrackRequest(BaseModel):
@@ -114,7 +116,7 @@ class BatchTrackRequest(BaseModel):
 class BulkTrackPayload(BaseModel):
     awbs: Optional[List[str]] = None
     text: Optional[str] = None
-    workers: Optional[int] = 5
+    workers: Optional[int] = 1
 
 
 class ExportPayload(BaseModel):
@@ -301,7 +303,7 @@ def track_bulk_shipments(payload: BulkTrackPayload):
     if not unique_awbs:
         raise HTTPException(status_code=400, detail="No valid AWB numbers found in request.")
 
-    engine = BulkCargoTracker(max_global_workers=payload.workers or 5)
+    engine = BulkCargoTracker(max_global_workers=payload.workers or 1)
     summary = engine.track_batch(unique_awbs)
     # Automatically persist/update master ledger without duplicates
     master_ledger.upsert_batch(summary.records)
@@ -309,7 +311,7 @@ def track_bulk_shipments(payload: BulkTrackPayload):
 
 
 @app.post("/api/v1/track/upload", tags=["Bulk Tracking"])
-async def track_uploaded_file(file: UploadFile = File(...), workers: int = Query(5)):
+async def track_uploaded_file(file: UploadFile = File(...), workers: int = Query(1)):
     """
     Upload an Excel spreadsheet (.xlsx, .xls), CSV file, or Text file.
     Extracts all AWBs automatically and tracks them in parallel.
@@ -443,7 +445,7 @@ class GoogleSheetSyncRequest(BaseModel):
     target_col: Optional[str] = "H"
     start_row: Optional[int] = None
     scan_all_tabs: Optional[bool] = False
-    workers: Optional[int] = 5
+    workers: Optional[int] = 1
     recheck_delivered: Optional[bool] = False
 
 
@@ -453,8 +455,8 @@ class AutoPilotConfigRequest(BaseModel):
     target_col: Optional[str] = "H"
     start_row: Optional[int] = 110
     scan_all_tabs: Optional[bool] = False
-    interval_minutes: Optional[int] = 30
-    workers: Optional[int] = 5
+    interval_minutes: Optional[int] = 60
+    workers: Optional[int] = 1
 
 
 @app.post("/api/v1/sheets/inspect", tags=["Google Sheets"])
@@ -497,7 +499,7 @@ def sync_and_track_google_sheet(payload: GoogleSheetSyncRequest):
             target_col=payload.target_col or "H",
             start_row=payload.start_row,
             scan_all_tabs=bool(payload.scan_all_tabs),
-            workers=payload.workers or 5,
+            workers=payload.workers or 1,
             recheck_delivered=bool(payload.recheck_delivered),
         )
     except GoogleSheetAccessError as e:
@@ -569,6 +571,124 @@ def get_lifecycle_shipments(
         "total_matched": len(records),
         "records": records,
     }
+
+
+# =========================================================================
+# Multi-Sheet Sources & Unified Tracking Queue + KPIs
+# =========================================================================
+
+class SheetSourceUpsertRequest(BaseModel):
+    url: str
+    label: Optional[str] = None
+    sheet_name: Optional[str] = None
+    target_col: Optional[str] = "H"
+    start_row: Optional[int] = 110
+    scan_all_tabs: Optional[bool] = True
+    is_enabled: Optional[bool] = True
+    source_id: Optional[int] = None
+
+
+class SheetSourceToggleRequest(BaseModel):
+    is_enabled: bool
+
+
+class MultiSheetSyncRequest(BaseModel):
+    workers: Optional[int] = 1
+
+
+@app.get("/api/v1/sheets/sources", tags=["Multi-Sheet Manager"])
+def list_sheet_sources():
+    """Returns all configured Google Sheet sources with their Enable/Disable status and sync metrics."""
+    return {
+        "status": "success",
+        "sources": master_ledger.list_sheet_sources(),
+    }
+
+
+@app.post("/api/v1/sheets/sources", tags=["Multi-Sheet Manager"])
+def upsert_sheet_source(payload: SheetSourceUpsertRequest):
+    """Adds or updates a Google Sheet source configuration."""
+    try:
+        src = master_ledger.upsert_sheet_source(
+            url=payload.url,
+            label=payload.label,
+            sheet_name=payload.sheet_name,
+            target_col=payload.target_col or "H",
+            start_row=payload.start_row or 110,
+            scan_all_tabs=True if payload.scan_all_tabs is None else bool(payload.scan_all_tabs),
+            is_enabled=True if payload.is_enabled is None else bool(payload.is_enabled),
+            source_id=payload.source_id,
+        )
+        return {"status": "success", "source": src}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.patch("/api/v1/sheets/sources/{source_id}/toggle", tags=["Multi-Sheet Manager"])
+def toggle_sheet_source(source_id: int, payload: SheetSourceToggleRequest):
+    """Enables or disables reading for a specific Google Sheet."""
+    updated = master_ledger.toggle_sheet_source(source_id, payload.is_enabled)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Sheet source {source_id} not found")
+    return {"status": "success", "source": updated}
+
+
+@app.delete("/api/v1/sheets/sources/{source_id}", tags=["Multi-Sheet Manager"])
+def delete_sheet_source(source_id: int):
+    """Removes a Google Sheet source from the multi-sheet list."""
+    deleted = master_ledger.delete_sheet_source(source_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Sheet source {source_id} not found")
+    return {"status": "success", "deleted_id": source_id}
+
+
+@app.post("/api/v1/sheets/sources/scan-only", tags=["Multi-Sheet Manager"])
+def scan_enabled_sheets_only():
+    """
+    Scans all ENABLED Google Sheets for new rows & new tabs (0 airline API calls),
+    registers new AWBs into the Active Tracking Queue, and returns updated KPIs + 2 tables.
+    """
+    try:
+        scan_res = sheets_tracker.scan_enabled_sheets()
+        queue_data = master_ledger.get_tracking_queue_and_kpis()
+        return {
+            "status": "success",
+            "scan_summary": scan_res,
+            **queue_data,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/sheets/sources/sync-track", tags=["Multi-Sheet Manager"])
+def sync_and_track_enabled_sheets(payload: Optional[MultiSheetSyncRequest] = None):
+    """
+    Scans all ENABLED Google Sheets + collects undelivered AWBs from Central Ledger,
+    tracks them live across airlines, and updates Active Tracking List vs Delivered Report.
+    """
+    try:
+        workers = (payload.workers if payload and payload.workers else 1)
+        return sheets_tracker.sync_all_enabled_sheets(workers=workers, track_live=True)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/v1/sheets/queue", tags=["Multi-Sheet Manager"])
+def get_tracking_queue_and_kpis(
+    search: Optional[str] = Query(None),
+    sheet_filter: Optional[str] = Query("ALL"),
+    limit: int = Query(2000, ge=1, le=10000),
+):
+    """
+    Returns the two lifecycle tables (Active Tracking List & Delivered Report) plus live KPIs
+    from local SQLite (0 external API calls).
+    """
+    data = master_ledger.get_tracking_queue_and_kpis(
+        search=search,
+        sheet_filter=sheet_filter,
+        limit=limit,
+    )
+    return {"status": "success", **data}
 
 
 class ProxyModeRequest(BaseModel):

@@ -42,9 +42,12 @@ class BulkCargoTracker:
     - Recovers from transient connection resets with automatic backoff.
     """
 
-    def __init__(self, max_global_workers: int = 5, max_domain_workers: int = 2):
+    def __init__(self, max_global_workers: int = 2, max_domain_workers: int = 1, safe_mode: bool = True):
+        from bulk_tracker.proxy_pool import install_requests_proxy_hook
+        install_requests_proxy_hook()
         self.max_global_workers = max_global_workers
         self.max_domain_workers = max_domain_workers
+        self.safe_mode = safe_mode
 
         # Singleton carrier clients
         self.clients = {
@@ -66,6 +69,8 @@ class BulkCargoTracker:
         # Domain level locks to prevent hammering any single airline portal
         self._carrier_locks: Dict[str, Lock] = {prefix: Lock() for prefix in CARRIER_PREFIXES}
         self._last_request_time: Dict[str, float] = {prefix: 0.0 for prefix in CARRIER_PREFIXES}
+        self._global_lock = Lock()
+        self._last_global_request_time: float = 0.0
 
     @staticmethod
     def identify_carrier(awb_input: str) -> Tuple[str, str, str, bool]:
@@ -92,19 +97,31 @@ class BulkCargoTracker:
 
     def _polite_domain_delay(self, prefix: str):
         """
-        Ensures a modest jittered pause between requests to the same airline portal,
-        preventing IP blocks and rate limits.
+        Industry-standard human-like pacing (zero-detection mode):
+        1. Global cross-carrier pacing (1.0 - 2.5s) prevents burst traffic signatures from your Mac IP.
+        2. Per-domain delay (3.5 - 7.0s) ensures the same airline portal is never hit faster than a human user.
         """
+        if self.safe_mode:
+            with self._global_lock:
+                now = time.time()
+                g_elapsed = now - self._last_global_request_time
+                g_target = random.uniform(1.0, 2.5)
+                if self._last_global_request_time > 0 and g_elapsed < g_target:
+                    time.sleep(g_target - g_elapsed)
+                self._last_global_request_time = time.time()
+
         lock = self._carrier_locks.get(prefix)
         if not lock:
             return
 
         with lock:
             now = time.time()
-            elapsed = now - self._last_request_time.get(prefix, 0.0)
-            target_delay = random.uniform(0.15, 0.35)
-            if elapsed < target_delay:
-                time.sleep(target_delay - elapsed)
+            last_t = self._last_request_time.get(prefix, 0.0)
+            if last_t > 0:
+                elapsed = now - last_t
+                target_delay = random.uniform(3.5, 7.0) if self.safe_mode else random.uniform(0.15, 0.35)
+                if elapsed < target_delay:
+                    time.sleep(target_delay - elapsed)
             self._last_request_time[prefix] = time.time()
 
     def track_single(self, raw_awb: str, max_retries: int = 2) -> UnifiedTrackingRecord:

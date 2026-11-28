@@ -97,22 +97,8 @@ class QatarCargoClient:
 
         intercepted_so: Optional[Dict[str, Any]] = None
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=USER_AGENT,
-                viewport={"width": 1440, "height": 1100},
-                locale="en-US",
-                timezone_id="Asia/Kolkata",
-            )
-            page = context.new_page()
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=self.timeout_ms) as (page, context, browser):
 
             # Network listener for Salesforce Aura Apex responses
             def on_response(res):
@@ -199,8 +185,6 @@ class QatarCargoClient:
                 os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                 page.screenshot(path=screenshot_path, full_page=True)
                 logger.info(f"Saved visual screenshot to {screenshot_path}")
-
-            browser.close()
 
         if not_found_detected:
             raise QatarShipmentNotFoundError(

@@ -42,24 +42,8 @@ class LufthansaBrowserTracker:
         serial = self.extract_serial(awb_input)
         logger.info(f"Initiating browser tracking for serial: {serial} (input: {awb_input})")
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1440, "height": 900},
-                locale="en-US",
-            )
-            page = context.new_page()
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=timeout_ms) as (page, context, browser):
 
             try:
                 page.goto(PORTAL_URL, wait_until="domcontentloaded", timeout=timeout_ms)
@@ -141,8 +125,6 @@ class LufthansaBrowserTracker:
                 os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                 page.screenshot(path=screenshot_path, full_page=True)
                 logger.info(f"Saved full page screenshot to {screenshot_path}")
-
-            browser.close()
 
             return {
                 "awb_serial": serial,

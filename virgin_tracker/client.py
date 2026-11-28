@@ -96,22 +96,8 @@ class VirginCargoClient:
         intercepted_search: Dict[str, Any] = {}
         intercepted_detail: Dict[str, Any] = {}
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=USER_AGENT,
-                viewport={"width": 1440, "height": 1000},
-                locale="en-US",
-                timezone_id="Asia/Kolkata",
-            )
-            page = context.new_page()
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=self.timeout_ms) as (page, context, browser):
 
             # Listen for backend API responses
             def on_response(res):
@@ -169,7 +155,6 @@ class VirginCargoClient:
                 if screenshot_path:
                     os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                     page.screenshot(path=screenshot_path, full_page=True)
-                browser.close()
                 raise VirginShipmentNotFoundError(
                     f"Could not find AWB {formatted_awb}. No matching records found on Virgin Atlantic Cargo."
                 )
@@ -197,8 +182,6 @@ class VirginCargoClient:
                 os.makedirs(os.path.dirname(os.path.abspath(screenshot_path)), exist_ok=True)
                 page.screenshot(path=screenshot_path, full_page=True)
                 logger.info(f"Saved visual screenshot to {screenshot_path}")
-
-            browser.close()
 
         # Parse data from detail response or fallback to search summary
         if intercepted_detail.get("data") and "orderItems" in intercepted_detail["data"]:

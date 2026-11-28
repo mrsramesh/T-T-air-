@@ -132,8 +132,46 @@ class MasterLedgerManager:
                 updated_at TEXT NOT NULL
             );
             """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS sheet_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL,
+                url TEXT NOT NULL,
+                sheet_id TEXT NOT NULL UNIQUE,
+                sheet_name TEXT,
+                target_col TEXT NOT NULL DEFAULT 'H',
+                start_row INTEGER NOT NULL DEFAULT 110,
+                scan_all_tabs INTEGER NOT NULL DEFAULT 1,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                last_signature TEXT,
+                known_tabs_json TEXT,
+                last_row_count INTEGER DEFAULT 0,
+                last_new_today INTEGER DEFAULT 0,
+                last_synced_at TEXT,
+                last_checked_at TEXT,
+                last_error TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """)
+            # Safe additive migrations for master_awb_ledger
+            cur = conn.execute("PRAGMA table_info(master_awb_ledger);")
+            existing_cols = {row["name"] for row in cur.fetchall()}
+            migrations = [
+                ("source_sheet_id", "TEXT"),
+                ("source_sheet_label", "TEXT"),
+                ("source_tab", "TEXT"),
+                ("source_cell", "TEXT"),
+                ("added_via", "TEXT DEFAULT 'manual'"),
+                ("sheet_added_date", "TEXT"),
+            ]
+            for col_name, col_type in migrations:
+                if col_name not in existing_cols:
+                    conn.execute(f"ALTER TABLE master_awb_ledger ADD COLUMN {col_name} {col_type};")
+
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_status ON master_awb_ledger(status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_updated ON master_awb_ledger(last_updated_at);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_sheet_date ON master_awb_ledger(sheet_added_date);")
             conn.commit()
 
     @sqlite_retry()
@@ -394,6 +432,67 @@ class MasterLedgerManager:
                 self.upsert_record(rec)
                 count += 1
         return count
+
+    @sqlite_retry()
+    def sync_sheet_metadata(
+        self,
+        clean_awb: str,
+        customer_name: Optional[str] = None,
+        destination: Optional[str] = None,
+        pkg_pieces: Any = None,
+        gross_weight: Any = None,
+    ) -> bool:
+        """
+        Syncs edited Google Sheet metadata (customer, destination, packages, weight)
+        into an existing ledger record without altering its tracking status.
+        """
+        clean_key = self._clean_awb_key(clean_awb)
+        if not clean_key:
+            return False
+
+        updates = []
+        params: List[Any] = []
+
+        if customer_name and str(customer_name).strip() not in ("", "---", "General Cargo", "None"):
+            updates.append("customer_name = ?")
+            params.append(str(customer_name).strip())
+
+        if destination and str(destination).strip() not in ("", "---", "None"):
+            updates.append("destination = ?")
+            params.append(str(destination).strip())
+
+        if pkg_pieces not in (None, "", "DONE", "---"):
+            try:
+                pcs = int(float(str(pkg_pieces)))
+                updates.append("package_pieces = ?")
+                params.append(pcs)
+                updates.append("package_display = ?")
+                params.append(f"{pcs} pcs")
+            except Exception:
+                pass
+
+        if gross_weight not in (None, "", "---"):
+            wt_str = str(gross_weight).strip()
+            if not wt_str.lower().endswith("kg"):
+                wt_str = f"{wt_str} kg"
+            updates.append("gross_weight = ?")
+            params.append(wt_str)
+
+        if not updates:
+            return False
+
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        updates.append("last_updated_at = ?")
+        params.append(now_iso)
+        params.append(clean_key)
+
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                f"UPDATE master_awb_ledger SET {', '.join(updates)} WHERE awb_clean = ?;",
+                params,
+            )
+            conn.commit()
+            return cur.rowcount > 0
 
     @sqlite_retry()
     def get_record_by_awb(self, clean_or_formatted_awb: str) -> Optional[Dict[str, Any]]:
@@ -707,6 +806,441 @@ class MasterLedgerManager:
             ])
 
         return output.getvalue()
+
+    # =========================================================================
+    # Multi-Sheet Sources & Unified Tracking Queue + KPIs
+    # =========================================================================
+
+    @staticmethod
+    def _extract_sheet_id(url_or_id: str) -> str:
+        import re as _re
+        raw = str(url_or_id or "").strip()
+        m = _re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", raw)
+        if m:
+            return m.group(1)
+        clean = _re.sub(r"[^a-zA-Z0-9-_]", "", raw)
+        if len(clean) >= 20:
+            return clean
+        raise ValueError(f"Invalid Google Sheet URL or ID: '{url_or_id}'")
+
+    @sqlite_retry()
+    def list_sheet_sources(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """Returns all configured Google Sheet sources."""
+        query = "SELECT * FROM sheet_sources"
+        if enabled_only:
+            query += " WHERE is_enabled = 1"
+        query += " ORDER BY id ASC;"
+        with self._get_connection() as conn:
+            rows = conn.execute(query).fetchall()
+            result = []
+            for r in rows:
+                d = dict(r)
+                d["is_enabled"] = bool(d.get("is_enabled", 1))
+                d["scan_all_tabs"] = bool(d.get("scan_all_tabs", 1))
+                try:
+                    d["known_tabs"] = json.loads(d.get("known_tabs_json") or "[]")
+                except Exception:
+                    d["known_tabs"] = []
+                result.append(d)
+            return result
+
+    @sqlite_retry()
+    def get_sheet_source(self, source_id: int) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM sheet_sources WHERE id = ? LIMIT 1;", (source_id,)).fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            d["is_enabled"] = bool(d.get("is_enabled", 1))
+            d["scan_all_tabs"] = bool(d.get("scan_all_tabs", 1))
+            try:
+                d["known_tabs"] = json.loads(d.get("known_tabs_json") or "[]")
+            except Exception:
+                d["known_tabs"] = []
+            return d
+
+    @sqlite_retry()
+    def upsert_sheet_source(
+        self,
+        url: str,
+        label: Optional[str] = None,
+        sheet_name: Optional[str] = None,
+        target_col: str = "H",
+        start_row: int = 110,
+        scan_all_tabs: bool = True,
+        is_enabled: bool = True,
+        source_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Creates or updates a Google Sheet source configuration."""
+        sheet_id = self._extract_sheet_id(url)
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        clean_label = (label or "").strip() or f"Sheet ({sheet_id[:8]}...)"
+        clean_col = (target_col or "H").strip().upper()
+        clean_row = max(1, int(start_row or 110))
+
+        with self._get_connection() as conn:
+            if source_id is not None:
+                conn.execute(
+                    """
+                    UPDATE sheet_sources
+                    SET label = ?, url = ?, sheet_id = ?, sheet_name = ?,
+                        target_col = ?, start_row = ?, scan_all_tabs = ?,
+                        is_enabled = ?, updated_at = ?
+                    WHERE id = ?;
+                    """,
+                    (
+                        clean_label, url.strip(), sheet_id, sheet_name,
+                        clean_col, clean_row, int(bool(scan_all_tabs)),
+                        int(bool(is_enabled)), now_iso, int(source_id),
+                    ),
+                )
+                conn.commit()
+                return self.get_sheet_source(int(source_id)) or {}
+
+            conn.execute(
+                """
+                INSERT INTO sheet_sources (
+                    label, url, sheet_id, sheet_name, target_col, start_row,
+                    scan_all_tabs, is_enabled, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(sheet_id) DO UPDATE SET
+                    label = excluded.label,
+                    url = excluded.url,
+                    sheet_name = excluded.sheet_name,
+                    target_col = excluded.target_col,
+                    start_row = excluded.start_row,
+                    scan_all_tabs = excluded.scan_all_tabs,
+                    is_enabled = excluded.is_enabled,
+                    updated_at = excluded.updated_at;
+                """,
+                (
+                    clean_label, url.strip(), sheet_id, sheet_name,
+                    clean_col, clean_row, int(bool(scan_all_tabs)),
+                    int(bool(is_enabled)), now_iso, now_iso,
+                ),
+            )
+            conn.commit()
+            row = conn.execute("SELECT id FROM sheet_sources WHERE sheet_id = ? LIMIT 1;", (sheet_id,)).fetchone()
+            return self.get_sheet_source(row["id"]) if row else {}
+
+    @sqlite_retry()
+    def toggle_sheet_source(self, source_id: int, is_enabled: bool) -> Optional[Dict[str, Any]]:
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE sheet_sources SET is_enabled = ?, updated_at = ? WHERE id = ?;",
+                (int(bool(is_enabled)), now_iso, int(source_id)),
+            )
+            conn.commit()
+        return self.get_sheet_source(int(source_id))
+
+    @sqlite_retry()
+    def delete_sheet_source(self, source_id: int) -> bool:
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT sheet_id FROM sheet_sources WHERE id = ? LIMIT 1;", (int(source_id),)).fetchone()
+            cur = conn.execute("DELETE FROM sheet_sources WHERE id = ?;", (int(source_id),))
+            if row and row["sheet_id"]:
+                conn.execute(
+                    "DELETE FROM master_awb_ledger WHERE source_sheet_id = ? AND status = 'PENDING' AND added_via = 'sheet';",
+                    (row["sheet_id"],),
+                )
+            conn.commit()
+            return cur.rowcount > 0
+
+    @sqlite_retry()
+    def prune_stale_sheet_stubs(self, source_sheet_id: str, valid_clean_awbs: List[str]) -> int:
+        """
+        Removes PENDING sheet-stub rows for `source_sheet_id` that are no longer in `valid_clean_awbs`
+        (e.g. rows before start_row/starting_tab), plus any orphan PENDING stubs from deleted sheets.
+        Never deletes already-tracked records (status != 'PENDING').
+        """
+        valid_set = set(valid_clean_awbs or [])
+        removed = 0
+        with self._get_connection() as conn:
+            # 1. Remove orphan PENDING sheet stubs whose sheet_id is not in sheet_sources
+            cur1 = conn.execute("""
+                DELETE FROM master_awb_ledger
+                WHERE status = 'PENDING' AND added_via = 'sheet'
+                  AND (source_sheet_id IS NULL OR source_sheet_id NOT IN (SELECT sheet_id FROM sheet_sources));
+            """)
+            removed += cur1.rowcount
+
+            # 2. Remove PENDING stubs for this sheet_id that are outside the current manifest
+            rows = conn.execute(
+                "SELECT awb_clean FROM master_awb_ledger WHERE source_sheet_id = ? AND status = 'PENDING' AND added_via = 'sheet';",
+                (source_sheet_id,),
+            ).fetchall()
+            to_delete = [(r["awb_clean"],) for r in rows if r["awb_clean"] not in valid_set]
+            if to_delete:
+                conn.executemany(
+                    "DELETE FROM master_awb_ledger WHERE awb_clean = ? AND status = 'PENDING' AND added_via = 'sheet';",
+                    to_delete,
+                )
+                removed += len(to_delete)
+            conn.commit()
+        return removed
+
+    @sqlite_retry()
+    def update_sheet_source_sync_state(
+        self,
+        source_id: int,
+        last_signature: Optional[str] = None,
+        known_tabs: Optional[List[str]] = None,
+        last_row_count: Optional[int] = None,
+        last_new_today: Optional[int] = None,
+        synced: bool = False,
+        last_error: Optional[str] = None,
+    ):
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        updates = ["last_checked_at = ?", "updated_at = ?", "last_error = ?"]
+        params: List[Any] = [now_iso, now_iso, last_error]
+
+        if last_signature is not None:
+            updates.append("last_signature = ?")
+            params.append(last_signature)
+        if known_tabs is not None:
+            updates.append("known_tabs_json = ?")
+            params.append(json.dumps(known_tabs))
+        if last_row_count is not None:
+            updates.append("last_row_count = ?")
+            params.append(int(last_row_count))
+        if last_new_today is not None:
+            updates.append("last_new_today = ?")
+            params.append(int(last_new_today))
+        if synced:
+            updates.append("last_synced_at = ?")
+            params.append(now_iso)
+
+        params.append(int(source_id))
+        with self._get_connection() as conn:
+            conn.execute(
+                f"UPDATE sheet_sources SET {', '.join(updates)} WHERE id = ?;",
+                params,
+            )
+            conn.commit()
+
+    @sqlite_retry()
+    def ensure_default_sheet_source(
+        self,
+        default_url: str,
+        label: str = "Primary Cargo Sheet",
+        sheet_name: Optional[str] = "NOV-26",
+        target_col: str = "H",
+        start_row: int = 110,
+        scan_all_tabs: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Auto-migrates the single configured sheet into sheet_sources if empty."""
+        existing = self.list_sheet_sources()
+        if existing:
+            return existing
+        saved = self.load_autopilot_state()
+        cfg = (saved or {}).get("config") or {}
+        url = cfg.get("url") or default_url
+        if url:
+            self.upsert_sheet_source(
+                url=url,
+                label=label,
+                sheet_name=cfg.get("sheet_name") or sheet_name,
+                target_col=cfg.get("target_col") or target_col,
+                start_row=int(cfg.get("start_row") or start_row),
+                scan_all_tabs=bool(cfg.get("scan_all_tabs", scan_all_tabs)),
+                is_enabled=True,
+            )
+        return self.list_sheet_sources()
+
+    @sqlite_retry()
+    def register_sheet_awb_stub(
+        self,
+        clean_awb: str,
+        formatted_awb: str,
+        customer_name: Optional[str] = None,
+        destination: Optional[str] = None,
+        pkg_pieces: Any = None,
+        gross_weight: Any = None,
+        source_sheet_id: Optional[str] = None,
+        source_sheet_label: Optional[str] = None,
+        source_tab: Optional[str] = None,
+        source_cell: Optional[str] = None,
+    ) -> bool:
+        """
+        Ensures an AWB discovered in an enabled Google Sheet is registered in the ledger.
+        Returns True if this is a brand-new AWB not previously in the system.
+        """
+        clean_key = self._clean_awb_key(clean_awb)
+        if not clean_key:
+            return False
+
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        existing = self.get_record_by_awb(clean_key)
+        if existing:
+            # Update source attribution & metadata without overwriting live tracking status
+            with self._get_connection() as conn:
+                conn.execute(
+                    """
+                    UPDATE master_awb_ledger
+                    SET source_sheet_id = COALESCE(?, source_sheet_id),
+                        source_sheet_label = COALESCE(?, source_sheet_label),
+                        source_tab = COALESCE(?, source_tab),
+                        source_cell = COALESCE(?, source_cell)
+                    WHERE awb_clean = ?;
+                    """,
+                    (source_sheet_id, source_sheet_label, source_tab, source_cell, clean_key),
+                )
+                conn.commit()
+            self.sync_sheet_metadata(
+                clean_awb=clean_key,
+                customer_name=customer_name,
+                destination=destination,
+                pkg_pieces=pkg_pieces,
+                gross_weight=gross_weight,
+            )
+            return False
+
+        cust = (customer_name or "").strip() or "General Cargo"
+        dest = (destination or "").strip() or "---"
+        pcs = None
+        pkg_disp = "---"
+        if pkg_pieces not in (None, "", "DONE", "---"):
+            try:
+                pcs = int(float(str(pkg_pieces)))
+                pkg_disp = f"{pcs} pcs"
+            except Exception:
+                pass
+        wt_str = "---"
+        if gross_weight not in (None, "", "---"):
+            wt_str = str(gross_weight).strip()
+            if not wt_str.lower().endswith("kg"):
+                wt_str = f"{wt_str} kg"
+
+        prefix = clean_key[:3] if len(clean_key) >= 3 else ""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO master_awb_ledger (
+                    awb_clean, awb_no, customer_name, package_pieces, package_display,
+                    gross_weight, volume_weight, iata, iata_prefix, carrier_name, carrier_code,
+                    flight_code, source, destination, direction_transition, status,
+                    status_detail, latest_activity, latest_location, first_tracked_at,
+                    last_updated_at, tracked_count, source_sheet_id, source_sheet_label,
+                    source_tab, source_cell, added_via, sheet_added_date
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, '---', ?, ?, 'Pending Sync', '',
+                    '---', '---', ?, 'Queued from Google Sheet', 'PENDING',
+                    'Discovered in Google Sheet (awaiting carrier tracking)',
+                    'Queued for tracking', ?, ?, ?, 0, ?, ?, ?, ?, 'sheet', ?
+                );
+                """,
+                (
+                    clean_key, formatted_awb or clean_key, cust, pcs, pkg_disp,
+                    wt_str, prefix, prefix, dest, dest, now_iso, now_iso,
+                    source_sheet_id, source_sheet_label, source_tab, source_cell, today_str,
+                ),
+            )
+            conn.commit()
+        return True
+
+    @sqlite_retry()
+    def get_tracking_queue_and_kpis(
+        self,
+        search: Optional[str] = None,
+        sheet_filter: Optional[str] = None,
+        limit: int = 2000,
+    ) -> Dict[str, Any]:
+        """
+        Returns the two lifecycle tables + rich KPIs:
+        - active_queue: All undelivered AWBs (new from enabled sheets + pending from central ledger).
+        - delivered_report: All DELIVERED AWBs (completed report).
+        """
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        all_records_raw = self.get_all_records(search=search, limit=limit)
+
+        sheets = self.list_sheet_sources()
+        enabled_sheets = [s for s in sheets if s.get("is_enabled")]
+        enabled_sheet_ids = {s["sheet_id"] for s in enabled_sheets}
+
+        # Exclude PENDING sheet stubs belonging to disabled or deleted sheets
+        all_records = [
+            r for r in all_records_raw
+            if not (
+                (r.get("status") or "").upper() == "PENDING"
+                and r.get("added_via") == "sheet"
+                and r.get("source_sheet_id") not in enabled_sheet_ids
+            )
+        ]
+
+        if sheet_filter and sheet_filter != "ALL":
+            if sheet_filter == "CENTRAL":
+                filtered = [r for r in all_records if not r.get("source_sheet_id")]
+            else:
+                filtered = [r for r in all_records if r.get("source_sheet_id") == sheet_filter]
+        else:
+            filtered = all_records
+
+        active_queue = [r for r in filtered if (r.get("status") or "").upper() != "DELIVERED"]
+        delivered_report = [r for r in filtered if (r.get("status") or "").upper() == "DELIVERED"]
+
+        # Unfiltered KPI totals across the whole system
+        all_active = [r for r in all_records if (r.get("status") or "").upper() != "DELIVERED"]
+        all_delivered = [r for r in all_records if (r.get("status") or "").upper() == "DELIVERED"]
+
+        added_from_sheets_today = sum(
+            1 for r in all_records
+            if r.get("added_via") == "sheet" and r.get("sheet_added_date") == today_str
+        )
+        undelivered_from_sheets = sum(
+            1 for r in all_active
+            if r.get("source_sheet_id") or r.get("added_via") == "sheet"
+        )
+        active_from_sheets_today = sum(
+            1 for r in all_active
+            if r.get("added_via") == "sheet" and r.get("sheet_added_date") == today_str
+        )
+        picked_from_central_undelivered = max(0, len(all_active) - undelivered_from_sheets)
+        delivered_today = sum(
+            1 for r in all_delivered
+            if (r.get("last_updated_at") or "").startswith(today_str)
+        )
+
+        # Per-sheet breakdown (only for active configured sheet_sources)
+        active_sheet_ids = {s["sheet_id"] for s in sheets}
+        per_sheet: Dict[str, Dict[str, Any]] = {}
+        for r in all_records:
+            sid = r.get("source_sheet_id")
+            if not sid or sid not in active_sheet_ids:
+                continue
+            if sid not in per_sheet:
+                per_sheet[sid] = {
+                    "sheet_id": sid,
+                    "label": r.get("source_sheet_label") or sid[:8],
+                    "active_count": 0,
+                    "delivered_count": 0,
+                    "new_today_count": 0,
+                }
+            if (r.get("status") or "").upper() == "DELIVERED":
+                per_sheet[sid]["delivered_count"] += 1
+            else:
+                per_sheet[sid]["active_count"] += 1
+            if r.get("added_via") == "sheet" and r.get("sheet_added_date") == today_str:
+                per_sheet[sid]["new_today_count"] += 1
+
+        return {
+            "active_queue": active_queue,
+            "delivered_report": delivered_report,
+            "kpis": {
+                "total_active_queue": len(all_active),
+                "undelivered_from_sheets": undelivered_from_sheets,
+                "added_from_sheets_today": added_from_sheets_today,
+                "active_from_sheets_today": active_from_sheets_today,
+                "picked_from_central_undelivered": picked_from_central_undelivered,
+                "total_delivered": len(all_delivered),
+                "delivered_today": delivered_today,
+                "total_sheets": len(sheets),
+                "enabled_sheets": len(enabled_sheets),
+                "per_sheet": list(per_sheet.values()),
+            },
+        }
 
 
 # Global Singleton instance

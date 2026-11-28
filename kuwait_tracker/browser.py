@@ -60,30 +60,8 @@ class KuwaitBrowserTracker:
         error_message: Optional[str] = None
         has_results = False
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=headless,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1440, "height": 900},
-                locale="en-US",
-            )
-            page = context.new_page()
-
-            # Anti-detection stealth scripts
-            page.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                window.chrome = { runtime: {} };
-            """)
+        from bulk_tracker.browser_manager import BrowserManager
+        with BrowserManager.launch_stealth_page(headless=headless, timeout_ms=timeout_ms) as (page, context, browser):
 
             logger.info(f"Navigating to {PORTAL_URL}...")
             try:
@@ -196,7 +174,6 @@ class KuwaitBrowserTracker:
                 logger.info(f"Saved screenshot to {screenshot_path}")
 
             final_url = page.url
-            browser.close()
 
             # Retrieve structured data via direct client
             client = KuwaitCargoClient()

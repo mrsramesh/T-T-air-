@@ -32,8 +32,8 @@ class AutoPilotManager:
             "target_col": "H",
             "start_row": 110,
             "scan_all_tabs": False,
-            "interval_minutes": 30,
-            "workers": 5,
+            "interval_minutes": 60,
+            "workers": 1,
         }
 
         self.stats: Dict[str, Any] = {
@@ -51,6 +51,21 @@ class AutoPilotManager:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
+        self._last_manifest_sig: Optional[str] = None
+        self.sheet_watch_interval_sec: int = 300  # Check enabled Google Sheets for edits/new tabs every 5 mins (0 airline hits)
+
+        # Auto-migrate existing single sheet into sheet_sources as Sheet #1 if empty
+        try:
+            self.ledger.ensure_default_sheet_source(
+                default_url=self.config["url"],
+                label="Primary Cargo Sheet",
+                sheet_name=self.config.get("sheet_name") or "NOV-26",
+                target_col=self.config.get("target_col") or "H",
+                start_row=int(self.config.get("start_row") or 110),
+                scan_all_tabs=True,
+            )
+        except Exception as e:
+            logger.warning(f"[AutoPilot] Default sheet migration skipped: {e}")
 
     def get_status(self) -> Dict[str, Any]:
         """Returns the current state and metrics of the Auto-Pilot daemon."""
@@ -167,7 +182,11 @@ class AutoPilotManager:
         self._execute_cycle()
 
         while not self._stop_event.is_set():
-            interval_sec = max(60, int(self.config.get("interval_minutes", 30)) * 60)
+            import random
+            base_sec = max(60, int(self.config.get("interval_minutes", 60)) * 60)
+            # Anti-clockwork jitter: adds 30-180s random offset so bots don't fire on exact clock ticks
+            jitter_sec = random.randint(30, 180)
+            interval_sec = base_sec + jitter_sec
             next_time = datetime.datetime.now() + datetime.timedelta(seconds=interval_sec)
 
             with self._lock:
@@ -175,11 +194,24 @@ class AutoPilotManager:
 
             logger.info(f"[AutoPilot] Next scheduled cycle at {self.stats['next_run_time']}")
 
-            # Sleep in 1-second chunks to respond quickly to stop requests
-            for _ in range(interval_sec):
+            # Sleep in 1-second chunks; check all enabled Google Sheets every 5 minutes (0 airline hits)
+            for elapsed_sec in range(1, interval_sec + 1):
                 if self._stop_event.is_set():
                     break
                 time.sleep(1)
+
+                if elapsed_sec % self.sheet_watch_interval_sec == 0 and elapsed_sec < interval_sec - 10:
+                    try:
+                        scan_res = self.sheets_tracker.scan_enabled_sheets()
+                        if scan_res.get("changed_sheets") or scan_res.get("total_new_awbs", 0) > 0 or scan_res.get("new_tabs_detected"):
+                            logger.info(
+                                f"[AutoPilot Smart Watcher] Detected changes in enabled sheets "
+                                f"({scan_res.get('changed_sheets')}, new AWBs: {scan_res.get('total_new_awbs')}). "
+                                f"Triggering immediate sync..."
+                            )
+                            break
+                    except Exception as watch_err:
+                        logger.debug(f"[AutoPilot Smart Watcher] Multi-sheet check skipped: {watch_err}")
 
             if not self._stop_event.is_set():
                 self._execute_cycle()
@@ -192,24 +224,13 @@ class AutoPilotManager:
             self.stats["is_cycling"] = True
 
         try:
-            url = self.config["url"]
-            tab = self.config["sheet_name"]
-            col = self.config["target_col"]
-            start_row = self.config["start_row"]
-            scan_all = self.config["scan_all_tabs"]
-            workers = self.config.get("workers", 5)
-
-            result = self.sheets_tracker.sync_and_track_lifecycle(
-                url,
-                sheet_name=tab,
-                target_col=col,
-                start_row=start_row,
-                scan_all_tabs=scan_all,
+            workers = self.config.get("workers", 1)
+            result = self.sheets_tracker.sync_all_enabled_sheets(
                 workers=workers,
-                recheck_delivered=False,
+                track_live=True,
             )
 
-            new_delivered = result.get("delivered_count", 0)
+            new_delivered = result.get("newly_delivered_count", 0)
 
             with self._lock:
                 self.stats["total_cycles"] += 1

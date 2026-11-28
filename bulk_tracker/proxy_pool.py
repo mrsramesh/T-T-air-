@@ -274,3 +274,63 @@ class ProxyPoolManager:
 
 # Singleton proxy pool instance
 proxy_pool = ProxyPoolManager()
+
+_HOOK_INSTALLED = False
+
+
+def has_pysocks() -> bool:
+    """Checks if PySocks is installed for SOCKS5 support in Python requests."""
+    try:
+        import socks  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def install_requests_proxy_hook():
+    """
+    Globally hooks requests.Session.request so ALL HTTP carrier clients automatically:
+    - Route through active proxy_pool (Tor / Free Pool / Custom) when enabled.
+    - Skip localhost/127.0.0.1 internal calls.
+    - Gracefully avoid SOCKS5 crash if PySocks is missing.
+    - Auto-fallback to direct connection if a free proxy fails mid-request.
+    """
+    global _HOOK_INSTALLED
+    if _HOOK_INSTALLED:
+        return
+    try:
+        import requests
+    except ImportError:
+        return
+
+    orig_request = requests.Session.request
+
+    def wrapped_request(self, method, url, *args, **kwargs):
+        url_str = str(url or "")
+        # Never proxy local calls
+        if "127.0.0.1" in url_str or "localhost" in url_str:
+            return orig_request(self, method, url, *args, **kwargs)
+
+        if "proxies" not in kwargs or kwargs["proxies"] is None:
+            proxies = proxy_pool.get_requests_proxies()
+            if proxies:
+                proxy_val = proxies.get("https") or proxies.get("http") or ""
+                if proxy_val.startswith("socks") and not has_pysocks():
+                    logger.warning("[ProxyPool] SOCKS proxy active but 'pysocks' is not installed. Run 'pip install pysocks'. Falling back to direct for requests.")
+                else:
+                    kwargs["proxies"] = proxies
+                    try:
+                        resp = orig_request(self, method, url, *args, **kwargs)
+                        proxy_pool.report_success(proxy_val)
+                        return resp
+                    except (requests.exceptions.ProxyError, requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as pe:
+                        logger.warning(f"[ProxyPool] Proxy {proxy_val} failed for {url_str[:50]}: {pe}. Retrying direct...")
+                        proxy_pool.report_failure(proxy_val)
+                        kwargs.pop("proxies", None)
+                        return orig_request(self, method, url, *args, **kwargs)
+
+        return orig_request(self, method, url, *args, **kwargs)
+
+    requests.Session.request = wrapped_request
+    _HOOK_INSTALLED = True
+    logger.info("[ProxyPool] Global requests.Session proxy hook installed across all HTTP clients.")
