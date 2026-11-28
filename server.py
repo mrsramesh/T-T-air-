@@ -867,6 +867,208 @@ def test_alert(payload: AlertTestRequest):
     }
 
 
+@app.get("/api/v1/system/problems", tags=["System Diagnostics"])
+def get_system_problems():
+    """
+    Returns real-time runtime diagnostics and known system/architectural problems
+    with severity, root cause, affected modules, and current mitigation status.
+    """
+    proxy_st = proxy_pool.get_status()
+    cb_st = circuit_breaker.get_all_status()
+    queue_data = master_ledger.get_tracking_queue_and_kpis()
+    kpis = queue_data.get("kpis", {})
+    ap_st = autopilot.get_status()
+
+    problems = []
+
+    # 1. Live Proxy / IP Rotation Status
+    mode = proxy_st.get("mode", "off")
+    if mode == "off":
+        problems.append({
+            "id": "RUNTIME-PROXY-OFF",
+            "title": "Direct IP Mode Active (No Proxy Rotation)",
+            "severity": "P0",
+            "category": "runtime",
+            "status": "ACTIVE_RISK",
+            "affected": "bulk_tracker/proxy_pool.py, all 13 airline scrapers",
+            "description": "Outbound tracking requests are currently using your single static machine IP. Continuous high-frequency scraping can trigger PerimeterX (Turkish), reCAPTCHA v3 (Saudia), or Akamai/Cloudflare (Emirates) IP blocks.",
+            "mitigation": "Enable Tor SOCKS5 or Custom Residential Proxies in Settings, or use Safe Chunked Tracker with 2-7 min human-paced delays.",
+        })
+    elif mode == "tor" and not proxy_st.get("tor_available"):
+        problems.append({
+            "id": "RUNTIME-TOR-DOWN",
+            "title": "Tor Mode Selected But Tor Daemon Unreachable",
+            "severity": "P0",
+            "category": "runtime",
+            "status": "FAILING",
+            "affected": "bulk_tracker/proxy_pool.py (ports 9050/9150)",
+            "description": "Proxy mode is set to 'tor', but no local Tor SOCKS5 daemon is listening on 127.0.0.1:9050 or 9150. Requests are falling back to Direct IP.",
+            "mitigation": "Start the local Tor service (`brew services start tor`) or switch proxy mode in Settings.",
+        })
+    elif mode == "free_pool" and proxy_st.get("healthy_proxies_count", 0) == 0:
+        problems.append({
+            "id": "RUNTIME-FREEPOOL-EMPTY",
+            "title": "Free Proxy Pool Has 0 Healthy Proxies",
+            "severity": "P1",
+            "category": "runtime",
+            "status": "DEGRADED",
+            "affected": "bulk_tracker/proxy_pool.py",
+            "description": "Free public proxy pool currently has 0 healthy nodes. Airline portals will time out or reject connections.",
+            "mitigation": "Switch to Custom Residential Proxies, Tor, or Direct IP with Safe Chunked Tracking.",
+        })
+
+    # 2. Live Carrier Circuit Breakers
+    degraded_carriers = [
+        (code, info) for code, info in cb_st.items()
+        if isinstance(info, dict) and info.get("state") in ("DEGRADED", "TRIPPED", "OPEN")
+    ]
+    for code, info in degraded_carriers:
+        problems.append({
+            "id": f"RUNTIME-CB-{code}",
+            "title": f"Carrier Portal Degraded / Tripped: {code}",
+            "severity": "P1",
+            "category": "runtime",
+            "status": info.get("state", "DEGRADED"),
+            "affected": f"{code} scraper & bulk_tracker/circuit_breaker.py",
+            "description": f"Consecutive failures: {info.get('consecutive_failures', 0)}. Last error: {info.get('last_error') or 'Unknown portal error'}. Fallback aggregator routing active: {info.get('fallback_active', False)}.",
+            "mitigation": "Circuit breaker automatically reroutes to fallback aggregators and probes recovery after timeout.",
+        })
+
+    # 3. Live Unreachable / Unsupported AWBs
+    unreachable_cnt = kpis.get("total_unreachable", 0)
+    if unreachable_cnt > 0:
+        problems.append({
+            "id": "RUNTIME-UNREACHABLE-AWBS",
+            "title": f"{unreachable_cnt} Unreachable / Unsupported AWBs in Quarantine",
+            "severity": "P2",
+            "category": "runtime",
+            "status": "ATTENTION",
+            "affected": "data/master_cargo_ledger.db (Table 3)",
+            "description": f"There are currently {unreachable_cnt} AWB records marked UNREACHABLE, ERROR, NOT_FOUND, or SKIPPED (unsupported airline prefix).",
+            "mitigation": "Inspect Table 3 in Auto Track or Masterdata -> Unreachable, verify airline prefix support, and click Retry for transient errors.",
+        })
+
+    # 4. AutoPilot Last Error
+    if ap_st.get("last_error"):
+        problems.append({
+            "id": "RUNTIME-AUTOPILOT-ERR",
+            "title": "Auto-Pilot Reported a Cycle Error",
+            "severity": "P1",
+            "category": "runtime",
+            "status": "ERROR",
+            "affected": "bulk_tracker/autopilot.py",
+            "description": str(ap_st.get("last_error")),
+            "mitigation": "Check Google Sheet URL accessibility and System Logs in Profile.",
+        })
+
+    # 5. Core Architectural & Scraper Risks (from system audit)
+    arch_problems = [
+        {
+            "id": "ARCH-01",
+            "title": "Anti-Bot Detection & IP Blacklisting Risk",
+            "severity": "P0",
+            "category": "architecture",
+            "status": "MITIGATED_PARTIAL" if mode != "off" else "OPEN",
+            "affected": "turkish_tracker, saudia_tracker, emirates_tracker, bulk_tracker/stealth.py",
+            "description": "Airline portals (PerimeterX, Google reCAPTCHA v3, Akamai/Cloudflare) block repeated queries from static residential/VPS IPs within hours if concurrency or frequency is too high.",
+            "mitigation": "Stealth headers & Playwright anti-detection scripts added; Safe Chunked Tracker enforces 2-7 min randomized cooldowns; Proxy Pool supports Tor & Custom Residential Proxies.",
+        },
+        {
+            "id": "ARCH-02",
+            "title": "Headless Chromium Memory Spikes & OOM Risk",
+            "severity": "P0",
+            "category": "architecture",
+            "status": "MITIGATED",
+            "affected": "bulk_tracker/stealth.py, bulk_tracker/engine.py, Playwright trackers",
+            "description": "Each Chromium instance consumes 150-350MB RAM. Uncapped parallel browser workers can exhaust host RAM and trigger OS OOM Killer or leave zombie browser processes.",
+            "mitigation": "BROWSER_CONCURRENCY_SEMAPHORE caps concurrent Chromium browsers to max 2, with low-memory flags and guaranteed cleanup.",
+        },
+        {
+            "id": "ARCH-03",
+            "title": "Unofficial Google Sheets XLSX Export Rate Limits (HTTP 429)",
+            "severity": "P1",
+            "category": "architecture",
+            "status": "MITIGATED_PARTIAL",
+            "affected": "bulk_tracker/google_sheets.py",
+            "description": "Polling public `/export?format=xlsx` links without official Google Sheets API v4 Service Account credentials can trigger HTTP 429 rate limits and does not support two-way cell write-back.",
+            "mitigation": "Exponential backoff and local caching implemented in google_sheets.py; official Sheets API v4 Service Account recommended for write-back.",
+        },
+        {
+            "id": "ARCH-04",
+            "title": "SQLite Concurrent Write Lock Contention",
+            "severity": "P1",
+            "category": "architecture",
+            "status": "MITIGATED",
+            "affected": "bulk_tracker/ledger.py, data/master_cargo_ledger.db",
+            "description": "Background Auto-Pilot / Safe Runner writes occurring simultaneously with UI reads or exports can cause 'database is locked' errors under default SQLite journal mode.",
+            "mitigation": "SQLite WAL mode (`PRAGMA journal_mode=WAL`), 15s `busy_timeout`, and `@sqlite_retry` decorator are active.",
+        },
+        {
+            "id": "ARCH-05",
+            "title": "Recycled AWB Numbers Trap (6-12 Month Reuse)",
+            "severity": "P2",
+            "category": "architecture",
+            "status": "MITIGATED",
+            "affected": "bulk_tracker/ledger.py (is_record_stale_or_recycled)",
+            "description": "Airlines recycle 8-digit AWB serials every 6-12 months. Skipping any AWB marked DELIVERED forever would ignore new shipments reusing an old AWB.",
+            "mitigation": "Records older than 60 days are automatically flagged as stale/recycled so new sheet appearances are re-tracked.",
+        },
+        {
+            "id": "ARCH-06",
+            "title": "Carrier Website DOM & API Breaking Changes",
+            "severity": "P1",
+            "category": "architecture",
+            "status": "MITIGATED_PARTIAL",
+            "affected": "All 13 *_tracker/client.py adapters",
+            "description": "Airline portals frequently update HTML selectors, JSON payloads, or anti-bot gates without notice, causing silent scraping failures.",
+            "mitigation": "CarrierCircuitBreaker monitors consecutive failures (trips at 5) and routes to fallback aggregators with Telegram/Webhook alerting.",
+        },
+    ]
+
+    problems.extend(arch_problems)
+
+    summary = {
+        "total": len(problems),
+        "p0_critical": sum(1 for p in problems if p["severity"] == "P0"),
+        "p1_high": sum(1 for p in problems if p["severity"] == "P1"),
+        "p2_medium": sum(1 for p in problems if p["severity"] == "P2"),
+        "runtime_count": sum(1 for p in problems if p["category"] == "runtime"),
+        "architecture_count": sum(1 for p in problems if p["category"] == "architecture"),
+    }
+
+    return {
+        "status": "success",
+        "summary": summary,
+        "problems": problems,
+        "live_diagnostics": {
+            "proxy": proxy_st,
+            "circuit_breakers": cb_st,
+            "unreachable_count": unreachable_cnt,
+            "autopilot_running": ap_st.get("is_running", False),
+            "safe_runner_running": safe_runner.is_running,
+        },
+    }
+
+
+@app.get("/api/v1/system/logs", tags=["System Diagnostics"])
+def get_system_logs(lines: int = Query(120, ge=10, le=500)):
+    """Returns recent lines from data/safe_tracker.log for the System Logs viewer."""
+    log_file = PROJECT_ROOT / "data" / "safe_tracker.log"
+    if not log_file.exists():
+        return {"status": "success", "log_file": str(log_file), "lines": []}
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.read().splitlines()
+        return {
+            "status": "success",
+            "log_file": str(log_file),
+            "total_lines": len(all_lines),
+            "lines": all_lines[-lines:],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read log file: {e}")
+
+
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def web_dashboard():
     """Enterprise Web Dashboard for Multi-Carrier Cargo Tracking (Single & Bulk Engine with Live Terminal Logs)."""
