@@ -720,11 +720,15 @@ class GoogleSheetsTracker:
                     "error": err,
                 })
 
+        # Pre-filter unsupported prefixes into Table 3 before any tracking runs
+        prefilter_res = self.ledger.prefilter_supported_queue()
+
         return {
             "enabled_count": len(enabled_sheets),
             "total_new_awbs": total_new_awbs,
             "changed_sheets": changed_sheets,
             "new_tabs_detected": new_tabs_detected,
+            "prefilter": prefilter_res,
             "sheets": sheet_summaries,
         }
 
@@ -747,10 +751,11 @@ class GoogleSheetsTracker:
 
         if track_live:
             active_records = self.ledger.get_active_shipments(limit=5000)
-            # Exclude SKIPPED (unsupported carrier prefix) from repeated airline hits
+            # Exclude SKIPPED and records still within the 6-hour cooldown cache
             to_track = [
                 r for r in active_records
                 if (r.get("status") or "").upper() not in ("DELIVERED", "SKIPPED")
+                and not self.ledger.get_fresh_cached_record(r.get("awb_clean") or "", cooldown_hours=6.0)
             ]
             if to_track:
                 awb_list = [r.get("awb_no") or r.get("awb_clean") for r in to_track]
@@ -778,4 +783,5 @@ class GoogleSheetsTracker:
             "kpis": queue_data["kpis"],
             "active_queue": queue_data["active_queue"],
             "delivered_report": queue_data["delivered_report"],
+            "unreachable_list": queue_data.get("unreachable_list", []),
         }

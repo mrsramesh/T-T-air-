@@ -1442,6 +1442,65 @@
                     <div class="m-val" id="kpiSheetDelivered">0</div>
                     <div style="font-size: 0.72rem; color: #16a34a; margin-top: 3px; font-weight: 600;" id="kpiDeliveredTodaySub">0 delivered today</div>
                 </div>
+                <div class="kpi-card kpi-unreachable" style="border-color: #fecaca;">
+                    <div class="m-lbl">🚫 Unreachable / Unsupported</div>
+                    <div class="m-val" style="color: #dc2626;" id="kpiTotalUnreachable">0</div>
+                    <div style="font-size: 0.72rem; color: #b91c1c; margin-top: 3px; font-weight: 600;">Moved to Table 3 (With Reason)</div>
+                </div>
+            </div>
+
+            <!-- SAFE CHUNKED HUMAN-PACED TRACKER & EXECUTION PLAN -->
+            <div class="autopilot-card" style="border-color: #bbf7d0; margin-bottom: 1.5rem;">
+                <div class="autopilot-header">
+                    <div class="autopilot-left">
+                        <div class="autopilot-icon-wrap" style="background: linear-gradient(135deg, #059669, #047857);">🛡️</div>
+                        <div>
+                            <h3 class="autopilot-title">
+                                <span>Safe Chunked Anti-Detection Tracker</span>
+                                <span id="safeTrackStatusBadge" class="badge-status bs-skipped" style="font-size: 0.74rem; padding: 3px 10px;">
+                                    <span class="status-dot"></span> <span id="safeTrackStatusText">READY</span>
+                                </span>
+                            </h3>
+                            <div class="autopilot-desc">
+                                Pre-filters unsupported prefixes into Table 3 first, shuffles carriers, &amp; tracks in small chunks with <strong>random 2–7 min cooldowns</strong> + proxy/stealth pacing so airlines never block you.
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <button class="quick-btn" onclick="checkSafeTrackHealth()">🩺 Check Proxy &amp; Health</button>
+                        <button class="quick-btn" onclick="previewSafePlan()">📋 Pre-Filter &amp; Show Plan</button>
+                        <button id="btnStartSafeTrack" class="btn-bulk-track" style="background: #059669; padding: 0.6rem 1.1rem;" onclick="startSafeChunkedTrack()">🛡️ Start Safe Chunked Track</button>
+                        <button id="btnStopSafeTrack" class="quick-btn" style="display:none; color:#dc2626; border-color:#fecaca;" onclick="stopSafeChunkedTrack()">⏹ Stop</button>
+                    </div>
+                </div>
+                <div id="safeHealthBanner" style="display:none; padding: 9px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; margin-bottom: 12px;"></div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Chunk Size (AWBs)</div>
+                        <input type="number" id="safeChunkSizeInput" value="6" min="1" max="20" class="gsheet-input" style="margin-top:4px; padding:5px 8px; text-align:center;" />
+                    </div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Min Delay (Min)</div>
+                        <input type="number" id="safeMinDelayInput" value="2" min="0.5" step="0.5" class="gsheet-input" style="margin-top:4px; padding:5px 8px; text-align:center;" />
+                    </div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Max Delay (Min)</div>
+                        <input type="number" id="safeMaxDelayInput" value="7" min="1" step="0.5" class="gsheet-input" style="margin-top:4px; padding:5px 8px; text-align:center;" />
+                    </div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Chunk Progress</div>
+                        <div class="val" id="safeChunkProgressVal" style="color:#059669;">0 / 0</div>
+                    </div>
+                    <div class="autopilot-stat-box">
+                        <div class="lbl">Next Chunk Cooldown</div>
+                        <div class="val" id="safeChunkCooldownVal" style="color:#0284c7;">---</div>
+                    </div>
+                </div>
+
+                <!-- Live Plan & Step-by-Step Execution Log -->
+                <div id="safePlanBox" style="display:none; background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; font-size:0.8rem;"></div>
+                <div id="safeStepLogsBox" style="display:none; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:10px 12px; font-family:'JetBrains Mono', monospace; font-size:0.75rem; max-height:170px; overflow-y:auto;"></div>
             </div>
 
             <!-- Filter & Search Bar for the 2 Tables -->
@@ -1534,6 +1593,43 @@
                         </thead>
                         <tbody id="deliveredReportTableBody">
                             <tr><td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">No delivered shipments yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TABLE 3: UNREACHABLE / UNSUPPORTED AWBs (WITH EXACT REASON) -->
+            <div class="dual-table-card" style="border-color: #fecaca;">
+                <div class="dual-table-head">
+                    <div>
+                        <h3 style="font-size: 1.05rem; font-weight: 800; color: #991b1b; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span>🚫 Table 3: Unreachable / Unsupported AWBs (Quarantined)</span>
+                            <span id="badgeUnreachableCount" style="background: #fee2e2; color: #b91c1c; font-size: 0.78rem; padding: 2px 10px; border-radius: 9999px; font-weight: 700;">0</span>
+                        </h3>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                            Pre-filtered unsupported prefixes (outside 13 carriers) &amp; carrier-blocked AWBs. Kept out of Table 1 until reason is fixed or retried.
+                        </div>
+                    </div>
+                    <button class="quick-btn" style="border-color:#fca5a5; color:#b91c1c; background:#fef2f2;" onclick="retryUnreachableAwb(null)">🔄 Retry Supported Reachable</button>
+                </div>
+                <div class="bulk-table-wrap">
+                    <table class="bulk-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th style="width: 155px;">Source (Sheet / Central)</th>
+                                <th style="width: 145px;">Customer Name</th>
+                                <th style="width: 135px;">AWB No</th>
+                                <th style="width: 145px;">Carrier / Prefix</th>
+                                <th style="width: 90px;">Dest</th>
+                                <th style="width: 120px;">Status</th>
+                                <th>Exact Unreachable / Unsupported Reason</th>
+                                <th style="width: 110px;">Updated</th>
+                                <th style="width: 90px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unreachableTableBody">
+                            <tr><td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No unreachable or unsupported AWBs.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1651,6 +1747,8 @@
                 logTerminal('Switched view to Multi-Sheet Auto-Tracker & 2-Table Queue.', 'info');
                 loadSheetSources();
                 refreshMultiSheetQueue();
+                checkSafeTrackHealth();
+                pollSafeTrackStatus();
                 fetchAutoPilotStatus();
                 ensureAutoPilotPolling();
             } else {
@@ -2658,7 +2756,19 @@
                     throw new Error(envelope.detail || 'Shipment tracking failed');
                 }
 
-                logTerminal(`✔ Successfully retrieved tracking details for ${awbRaw} (${envelope.carrier})`, 'success');
+                if (envelope.cached && envelope.cache_message) {
+                    logTerminal(`⚡ [6h DB Cache] ${awbRaw}: ${envelope.cache_message}`, 'info');
+                    const errBox = document.getElementById('errorBox');
+                    if (errBox) {
+                        errBox.style.display = 'block';
+                        errBox.style.background = '#eff6ff';
+                        errBox.style.color = '#1e40af';
+                        errBox.style.borderColor = '#bfdbfe';
+                        errBox.innerText = `⚡ ${envelope.cache_message}`;
+                    }
+                } else {
+                    logTerminal(`✔ Successfully retrieved tracking details for ${awbRaw} (${envelope.carrier})`, 'success');
+                }
 
                 const cName = envelope.carrier;
                 const data = envelope.data;
@@ -3674,7 +3784,9 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
         let currentMultiSheetSources = [];
         let currentActiveQueueData = [];
         let currentDeliveredReportData = [];
+        let currentUnreachableData = [];
         let queueAutoRefreshTimer = null;
+        let safeTrackPollTimer = null;
 
         function ensureQueueAutoRefresh() {
             if (queueAutoRefreshTimer) return;
@@ -3954,6 +4066,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
         function applyQueueAndKpiPayload(data) {
             currentActiveQueueData = data.active_queue || [];
             currentDeliveredReportData = data.delivered_report || [];
+            currentUnreachableData = data.unreachable_list || [];
             const k = data.kpis || {};
 
             const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
@@ -3963,6 +4076,7 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
             setTxt('kpiCentralUndelivered', k.picked_from_central_undelivered ?? 0);
             setTxt('kpiSheetDelivered', k.total_delivered ?? currentDeliveredReportData.length);
             setTxt('kpiDeliveredTodaySub', `${k.delivered_today ?? 0} delivered today`);
+            setTxt('kpiTotalUnreachable', k.total_unreachable ?? currentUnreachableData.length);
 
             const perSheetActive = (k.per_sheet || []).map(p => `${p.label}: ${p.active_count}`).join(' · ');
             setTxt('kpiPerSheetActive', perSheetActive || 'From sheets starting point');
@@ -3991,14 +4105,208 @@ if (cName.includes('IndiGo') || cName.includes('312') || cName.includes('6E')) {
 
             const activeFiltered = currentActiveQueueData.filter(matchFn);
             const deliveredFiltered = currentDeliveredReportData.filter(matchFn);
+            const unreachableFiltered = currentUnreachableData.filter(matchFn);
 
             const bAct = document.getElementById('badgeActiveQueueCount');
             const bDel = document.getElementById('badgeDeliveredReportCount');
+            const bUnr = document.getElementById('badgeUnreachableCount');
             if (bAct) bAct.innerText = activeFiltered.length;
             if (bDel) bDel.innerText = deliveredFiltered.length;
+            if (bUnr) bUnr.innerText = unreachableFiltered.length;
 
             renderQueueTableRows('activeQueueTableBody', activeFiltered, 'No active undelivered AWBs in tracking list.');
             renderQueueTableRows('deliveredReportTableBody', deliveredFiltered, 'No delivered AWBs in report yet.');
+            renderUnreachableTableRows(unreachableFiltered);
+        }
+
+        function renderUnreachableTableRows(rows) {
+            const tbody = document.getElementById('unreachableTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!rows || rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No unreachable or unsupported AWBs.</td></tr>`;
+                return;
+            }
+            rows.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                const sourceHtml = r.source_sheet_id
+                    ? `<span class="source-pill">📄 ${(r.source_sheet_label || 'Sheet').slice(0, 16)} · ${r.source_tab || ''}</span>`
+                    : `<span class="source-pill central">🗄️ Central Table</span>`;
+                const reason = r.unreachable_reason || r.status_detail || r.latest_activity || 'Unsupported or unreachable';
+                tr.innerHTML = `
+                    <td style="text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
+                    <td>${sourceHtml}</td>
+                    <td><strong style="color: #0f172a;">${r.customer_name || '---'}</strong></td>
+                    <td><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #991b1b;">${r.awb_no || r.awb_clean}</span></td>
+                    <td style="font-size: 0.78rem; font-weight:700;">${r.carrier_name || r.iata_prefix || '---'}</td>
+                    <td><strong>${r.destination || '---'}</strong></td>
+                    <td><span class="badge-status bs-notfound"><span class="status-dot"></span>${r.status}</span></td>
+                    <td style="font-size: 0.78rem; color: #b91c1c; font-weight: 600;">${reason}</td>
+                    <td style="font-size: 0.74rem; color: #64748b;">${(r.last_updated_at || '').slice(0, 16)}</td>
+                    <td style="text-align: center;">
+                        <button class="quick-btn" onclick="retryUnreachableAwb('${r.awb_clean}')">🔄 Retry</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function checkSafeTrackHealth() {
+            const banner = document.getElementById('safeHealthBanner');
+            try {
+                const resp = await fetch('/api/v1/sheets/safe-track/health');
+                const h = await resp.json();
+                if (!resp.ok || !banner) return;
+                banner.style.display = 'block';
+                const ok = h.proxy_ok && h.carriers_healthy;
+                banner.style.background = ok ? '#ecfdf5' : '#fffbeb';
+                banner.style.color = ok ? '#065f46' : '#92400e';
+                banner.style.border = ok ? '1px solid #a7f3d0' : '1px solid #fde68a';
+                const cbText = h.carriers_healthy ? '✅ All 13 Carriers Healthy' : `⚠️ Open Breakers: ${(h.open_circuit_breakers || []).join(', ')}`;
+                banner.innerHTML = `${h.proxy_ok ? '✅' : '⚠️'} <strong>Proxy:</strong> ${h.proxy_message} &nbsp;|&nbsp; ${cbText} &nbsp;|&nbsp; 📝 <strong>Log:</strong> <code>data/safe_tracker.log</code>`;
+            } catch (err) {
+                console.debug('Health check failed:', err);
+            }
+        }
+
+        async function previewSafePlan() {
+            const chunk_size = parseInt(document.getElementById('safeChunkSizeInput')?.value || '6', 10);
+            const min_delay_min = parseFloat(document.getElementById('safeMinDelayInput')?.value || '2');
+            const max_delay_min = parseFloat(document.getElementById('safeMaxDelayInput')?.value || '7');
+            try {
+                const resp = await fetch(`/api/v1/sheets/safe-track/plan?chunk_size=${chunk_size}&min_delay_min=${min_delay_min}&max_delay_min=${max_delay_min}`);
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Plan failed');
+                applyQueueAndKpiPayload(data);
+                renderSafePlanBox(data.plan);
+                logTerminal(`[SafeTrack Plan] ${data.plan.supported_to_track} supported AWBs across ${data.plan.total_chunks} chunks (${data.plan.prefiltered_unsupported_moved} unsupported moved to Table 3).`, 'info');
+            } catch (err) {
+                logTerminal(`[SafeTrack Plan Error] ${err.message}`, 'error');
+            }
+        }
+
+        function renderSafePlanBox(plan) {
+            const box = document.getElementById('safePlanBox');
+            if (!box || !plan) return;
+            box.style.display = 'block';
+            box.innerHTML = `
+                <div style="font-weight:800; color:#0f172a; margin-bottom:6px;">📋 Safe Execution Plan (Anti-Detection Mode)</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:6px; color:#334155;">
+                    <div>• <strong>Supported (13 Airlines):</strong> ${plan.supported_to_track ?? 0} AWBs</div>
+                    <div>• <strong>Skipped (6h DB Cache):</strong> ${plan.skipped_cooldown_6h ?? 0} AWBs (Resume-Safe)</div>
+                    <div>• <strong>Unsupported → Table 3:</strong> ${plan.total_unreachable_now ?? 0} AWBs</div>
+                    <div>• <strong>Chunks:</strong> ${plan.total_chunks ?? 0} (${plan.chunk_size ?? 6}/chunk, shuffled)</div>
+                    <div>• <strong>Chunk Cooldown:</strong> ${plan.chunk_delay_range_min || '2.0–7.0 min'}</div>
+                    <div>• <strong>Request Jitter:</strong> ${plan.per_request_jitter || '3.5–7.0s'}</div>
+                    <div>• <strong>Proxy Mode:</strong> ${(plan.proxy_mode || 'off').toUpperCase()} (🔒 Locked during run) · Est ~${plan.estimated_total_minutes ?? 0} min</div>
+                </div>
+            `;
+        }
+
+        async function startSafeChunkedTrack() {
+            const chunk_size = parseInt(document.getElementById('safeChunkSizeInput')?.value || '6', 10);
+            const min_delay_min = parseFloat(document.getElementById('safeMinDelayInput')?.value || '2');
+            const max_delay_min = parseFloat(document.getElementById('safeMaxDelayInput')?.value || '7');
+            try {
+                const resp = await fetch('/api/v1/sheets/safe-track/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chunk_size, min_delay_min, max_delay_min }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Start failed');
+                logTerminal('[SafeTrack] Background chunked tracking started.', 'success');
+                await pollSafeTrackStatus();
+                if (!safeTrackPollTimer) {
+                    safeTrackPollTimer = setInterval(pollSafeTrackStatus, 3000);
+                }
+            } catch (err) {
+                logTerminal(`[SafeTrack Start Error] ${err.message}`, 'error');
+            }
+        }
+
+        async function stopSafeChunkedTrack() {
+            try {
+                await fetch('/api/v1/sheets/safe-track/stop', { method: 'POST' });
+                logTerminal('[SafeTrack] Stop requested (finishing current AWB safely).', 'warning');
+                await pollSafeTrackStatus();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function pollSafeTrackStatus() {
+            try {
+                const resp = await fetch('/api/v1/sheets/safe-track/status');
+                const data = await resp.json();
+                if (!resp.ok) return;
+
+                const badge = document.getElementById('safeTrackStatusBadge');
+                const txt = document.getElementById('safeTrackStatusText');
+                const startBtn = document.getElementById('btnStartSafeTrack');
+                const stopBtn = document.getElementById('btnStopSafeTrack');
+                const progEl = document.getElementById('safeChunkProgressVal');
+                const cdEl = document.getElementById('safeChunkCooldownVal');
+                const logsBox = document.getElementById('safeStepLogsBox');
+
+                const p = data.progress || {};
+                if (data.plan && Object.keys(data.plan).length > 0) renderSafePlanBox(data.plan);
+
+                if (progEl) progEl.innerText = `${p.current_chunk || 0} / ${p.total_chunks || 0} (${p.completed_awbs || 0}/${p.total_to_track || 0})`;
+                if (cdEl) {
+                    const rem = p.next_chunk_in_sec || 0;
+                    cdEl.innerText = rem > 0 ? `${Math.floor(rem / 60)}m ${rem % 60}s` : (p.current_awb ? `Tracking ${p.current_awb}` : '---');
+                }
+
+                if (badge && txt) {
+                    if (data.is_running) {
+                        badge.className = 'badge-status bs-transit';
+                        txt.innerText = data.current_step || 'RUNNING';
+                    } else {
+                        badge.className = data.current_step === 'COMPLETED' ? 'badge-status bs-delivered' : 'badge-status bs-skipped';
+                        txt.innerText = data.current_step || 'READY';
+                    }
+                }
+                if (startBtn) startBtn.style.display = data.is_running ? 'none' : 'inline-flex';
+                if (stopBtn) stopBtn.style.display = data.is_running ? 'inline-flex' : 'none';
+                const proxySel = document.getElementById('proxyModeSelect');
+                if (proxySel) {
+                    proxySel.disabled = !!data.is_running;
+                    proxySel.title = data.is_running ? 'Locked while Safe Chunked Tracker is running' : 'Select Proxy Mode';
+                }
+
+                if (logsBox && data.step_logs && data.step_logs.length > 0) {
+                    logsBox.style.display = 'block';
+                    logsBox.innerHTML = data.step_logs.map(l => `<div><span style="color:#94a3b8;">[${l.time}]</span> <strong style="color:#38bdf8;">[${l.step}]</strong> ${l.message}</div>`).join('');
+                    logsBox.scrollTop = logsBox.scrollHeight;
+                }
+
+                if (data.is_running) {
+                    await refreshMultiSheetQueue();
+                } else if (safeTrackPollTimer) {
+                    clearInterval(safeTrackPollTimer);
+                    safeTrackPollTimer = null;
+                    await refreshMultiSheetQueue();
+                }
+            } catch (err) {
+                console.debug(err);
+            }
+        }
+
+        async function retryUnreachableAwb(awbClean) {
+            try {
+                const resp = await fetch('/api/v1/sheets/unreachable/retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ awb_clean: awbClean }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Retry failed');
+                logTerminal(`[Table 3 Retry] Re-queued ${data.requeued_count || 0} AWB(s) back into Table 1.`, 'info');
+                applyQueueAndKpiPayload(data);
+            } catch (err) {
+                logTerminal(`[Retry Error] ${err.message}`, 'error');
+            }
         }
 
         function renderQueueTableRows(tbodyId, rows, emptyMsg) {

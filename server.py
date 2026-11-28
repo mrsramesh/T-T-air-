@@ -49,12 +49,14 @@ from bulk_tracker.google_sheets import (
     GoogleSheetError,
 )
 from bulk_tracker.autopilot import AutoPilotManager
+from bulk_tracker.safe_runner import SafeChunkedTracker
 from bulk_tracker.proxy_pool import proxy_pool, install_requests_proxy_hook
 from bulk_tracker.circuit_breaker import circuit_breaker
 from bulk_tracker.notifier import notifier
 
 sheets_tracker = GoogleSheetsTracker()
 autopilot = AutoPilotManager(sheets_tracker, master_ledger)
+safe_runner = SafeChunkedTracker(master_ledger)
 
 app = FastAPI(
     title="Multi-Carrier Air Cargo Tracking API",
@@ -183,12 +185,32 @@ def health_check():
 def track_shipment(
     awb: str,
     carrier: Optional[str] = Query("auto", description="Carrier: 'auto', 'airindia', 'lufthansa', 'emirates', 'kuwait', 'britishairways', 'virgin', 'qatar', 'cargoflash', 'neos', or 'indigo'"),
+    force: bool = Query(False, description="Bypass 6-hour DB cooldown cache"),
 ):
     """
     Track a shipment by AWB number.
     Auto-detects IndiGo CarGo (312), Neos Air Cargo (703), EgyptAir Cargo (077), Qatar Airways (157), Virgin Atlantic (932), British Airways (125), Kuwait Airways (229), Emirates SkyCargo (176), Lufthansa Cargo (020), or Air India (098).
     """
     target_carrier = carrier if carrier in ("airindia", "lufthansa", "emirates", "kuwait", "britishairways", "virgin", "virginatlantic", "qatar", "qrcargo", "cargoflash", "egyptair", "neos", "wcs", "neosair", "indigo", "6e", "indigocargo", "parcels", "turkish", "tk", "turkishcargo", "etihad", "ey", "etihadcargo", "saudia", "sv", "saudiacargo") else detect_carrier(awb)
+
+    if not force:
+        cached = master_ledger.get_fresh_cached_record(awb, cooldown_hours=6.0)
+        if cached and cached["record"].get("raw_payload_json"):
+            import json as _json
+            try:
+                rec = cached["record"]
+                raw_payload = _json.loads(rec["raw_payload_json"])
+                return {
+                    "carrier": rec.get("carrier_name") or "Cached Carrier",
+                    "carrier_code": rec.get("iata_prefix") or "",
+                    "cached": True,
+                    "cache_age_minutes": cached["age_minutes"],
+                    "remaining_minutes": cached["remaining_minutes"],
+                    "cache_message": cached["message"],
+                    "data": raw_payload,
+                }
+            except Exception:
+                pass
 
     # Automatically record & update in Master Ledger
     try:
@@ -540,6 +562,11 @@ def run_autopilot_now():
     """
     Trigger a manual sync cycle immediately via the Auto-Pilot engine.
     """
+    if safe_runner.is_running:
+        raise HTTPException(
+            status_code=409,
+            detail="Process Lock Active: Safe Chunked Tracker is currently running. Stop it before running Auto-Pilot.",
+        )
     return autopilot.run_now()
 
 
@@ -691,6 +718,82 @@ def get_tracking_queue_and_kpis(
     return {"status": "success", **data}
 
 
+# =========================================================================
+# Safe Chunked Human-Paced Tracking & Table 3 (Unreachable / Unsupported)
+# =========================================================================
+
+class SafeTrackStartRequest(BaseModel):
+    chunk_size: Optional[int] = 6
+    min_delay_min: Optional[float] = 2.0
+    max_delay_min: Optional[float] = 7.0
+
+
+class UnreachableRetryRequest(BaseModel):
+    awb_clean: Optional[str] = None
+
+
+@app.get("/api/v1/sheets/safe-track/plan", tags=["Safe Chunked Tracker"])
+def get_safe_track_plan(
+    chunk_size: int = Query(6, ge=1, le=20),
+    min_delay_min: float = Query(2.0, ge=0.5, le=30.0),
+    max_delay_min: float = Query(7.0, ge=0.5, le=60.0),
+):
+    """Pre-filters unsupported prefixes and returns a transparent execution plan (0 network calls)."""
+    plan = safe_runner.build_plan(
+        chunk_size=chunk_size,
+        min_delay_min=min_delay_min,
+        max_delay_min=max_delay_min,
+    )
+    queue_data = master_ledger.get_tracking_queue_and_kpis()
+    return {"status": "success", "plan": plan, **queue_data}
+
+
+@app.post("/api/v1/sheets/safe-track/start", tags=["Safe Chunked Tracker"])
+def start_safe_track(payload: Optional[SafeTrackStartRequest] = None):
+    """Starts background chunked human-paced tracking with random 2-7 min delays."""
+    p = payload or SafeTrackStartRequest()
+    return safe_runner.start(
+        chunk_size=p.chunk_size or 6,
+        min_delay_min=p.min_delay_min or 2.0,
+        max_delay_min=p.max_delay_min or 7.0,
+    )
+
+
+@app.post("/api/v1/sheets/safe-track/stop", tags=["Safe Chunked Tracker"])
+def stop_safe_track():
+    """Gracefully stops background chunked tracking after the current AWB."""
+    return safe_runner.stop()
+
+
+@app.get("/api/v1/sheets/safe-track/status", tags=["Safe Chunked Tracker"])
+def get_safe_track_status():
+    """Returns live step-by-step progress, chunk countdown, plan, and step logs."""
+    return safe_runner.get_status()
+
+
+@app.get("/api/v1/sheets/safe-track/health", tags=["Safe Chunked Tracker"])
+def get_safe_track_health():
+    """Returns live Proxy, Tor daemon, Circuit Breaker, and Queue health diagnostics."""
+    return safe_runner.run_health_check()
+
+
+@app.post("/api/v1/sheets/prefilter", tags=["Safe Chunked Tracker"])
+def prefilter_queue():
+    """Pre-filters Active Queue against 13 supported airlines (0 network calls)."""
+    pf = master_ledger.prefilter_supported_queue()
+    queue_data = master_ledger.get_tracking_queue_and_kpis()
+    return {"status": "success", "prefilter": pf, **queue_data}
+
+
+@app.post("/api/v1/sheets/unreachable/retry", tags=["Safe Chunked Tracker"])
+def retry_unreachable(payload: Optional[UnreachableRetryRequest] = None):
+    """Moves an unreachable AWB (or all supported-prefix unreachable AWBs) back to Table 1."""
+    awb = payload.awb_clean if payload else None
+    count = master_ledger.retry_unreachable_awb(awb)
+    queue_data = master_ledger.get_tracking_queue_and_kpis()
+    return {"status": "success", "requeued_count": count, **queue_data}
+
+
 class ProxyModeRequest(BaseModel):
     mode: str
     custom_proxies: Optional[List[str]] = None
@@ -705,6 +808,11 @@ def get_proxy_status():
 @app.post("/api/v1/proxy/mode", tags=["Proxy Engine"])
 def set_proxy_mode(payload: ProxyModeRequest):
     """Sets active proxy routing mode ('off', 'tor', 'free_pool', 'custom') and persists it."""
+    if safe_runner.is_running:
+        raise HTTPException(
+            status_code=409,
+            detail="Process Lock Active: Cannot change Proxy Mode while Safe Chunked Tracker is running. Stop the active run first.",
+        )
     proxy_pool.set_mode(payload.mode, payload.custom_proxies)
     master_ledger.save_setting("proxy_mode", {"mode": payload.mode, "custom_proxies": payload.custom_proxies})
     return {

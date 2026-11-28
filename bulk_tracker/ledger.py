@@ -164,6 +164,7 @@ class MasterLedgerManager:
                 ("source_cell", "TEXT"),
                 ("added_via", "TEXT DEFAULT 'manual'"),
                 ("sheet_added_date", "TEXT"),
+                ("unreachable_reason", "TEXT"),
             ]
             for col_name, col_type in migrations:
                 if col_name not in existing_cols:
@@ -502,6 +503,57 @@ class MasterLedgerManager:
             row = cur.fetchone()
             if row:
                 return dict(row)
+        return None
+
+    @sqlite_retry()
+    def get_fresh_cached_record(
+        self,
+        clean_or_formatted_awb: str,
+        cooldown_hours: float = 6.0,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        6-Hour Per-AWB Cooldown Lock:
+        Returns cached DB record metadata if the AWB already received a valid carrier result
+        within the last `cooldown_hours` (or is permanently DELIVERED).
+        Never caches PENDING stubs or transient failures (UNREACHABLE/ERROR).
+        """
+        rec = self.get_record_by_awb(clean_or_formatted_awb)
+        if not rec:
+            return None
+        status = (rec.get("status") or "").upper()
+        tracked_count = int(rec.get("tracked_count") or 0)
+        if tracked_count < 1 or status in ("PENDING", "UNREACHABLE", "ERROR", "SKIPPED", "NOT_FOUND"):
+            return None
+
+        if status == "DELIVERED":
+            return {
+                "record": rec,
+                "age_minutes": 0,
+                "remaining_minutes": 0,
+                "is_delivered_frozen": True,
+                "message": "DELIVERED (permanently frozen in DB — 0 airline hits)",
+            }
+
+        last_up = rec.get("last_updated_at")
+        if not last_up:
+            return None
+        try:
+            dt = datetime.strptime(last_up.strip(), "%Y-%m-%d %H:%M:%S")
+            age_sec = (datetime.now() - dt).total_seconds()
+            cooldown_sec = float(cooldown_hours) * 3600.0
+            if 0 <= age_sec < cooldown_sec:
+                age_min = max(1, int(age_sec // 60))
+                rem_min = max(1, int((cooldown_sec - age_sec) // 60))
+                rem_h, rem_m = divmod(rem_min, 60)
+                return {
+                    "record": rec,
+                    "age_minutes": age_min,
+                    "remaining_minutes": rem_min,
+                    "is_delivered_frozen": False,
+                    "message": f"Served from DB cache (updated {age_min}m ago — next live airline check in {rem_h}h {rem_m}m)",
+                }
+        except Exception:
+            pass
         return None
 
     @sqlite_retry()
@@ -1178,12 +1230,26 @@ class MasterLedgerManager:
         else:
             filtered = all_records
 
-        active_queue = [r for r in filtered if (r.get("status") or "").upper() != "DELIVERED"]
+        active_queue = [
+            r for r in filtered
+            if (r.get("status") or "").upper() not in ("DELIVERED", "SKIPPED", "UNREACHABLE", "ERROR", "NOT_FOUND")
+        ]
         delivered_report = [r for r in filtered if (r.get("status") or "").upper() == "DELIVERED"]
+        unreachable_list = [
+            r for r in filtered
+            if (r.get("status") or "").upper() in ("SKIPPED", "UNREACHABLE", "ERROR", "NOT_FOUND")
+        ]
 
         # Unfiltered KPI totals across the whole system
-        all_active = [r for r in all_records if (r.get("status") or "").upper() != "DELIVERED"]
+        all_active = [
+            r for r in all_records
+            if (r.get("status") or "").upper() not in ("DELIVERED", "SKIPPED", "UNREACHABLE", "ERROR", "NOT_FOUND")
+        ]
         all_delivered = [r for r in all_records if (r.get("status") or "").upper() == "DELIVERED"]
+        all_unreachable = [
+            r for r in all_records
+            if (r.get("status") or "").upper() in ("SKIPPED", "UNREACHABLE", "ERROR", "NOT_FOUND")
+        ]
 
         added_from_sheets_today = sum(
             1 for r in all_records
@@ -1228,6 +1294,7 @@ class MasterLedgerManager:
         return {
             "active_queue": active_queue,
             "delivered_report": delivered_report,
+            "unreachable_list": unreachable_list,
             "kpis": {
                 "total_active_queue": len(all_active),
                 "undelivered_from_sheets": undelivered_from_sheets,
@@ -1236,11 +1303,110 @@ class MasterLedgerManager:
                 "picked_from_central_undelivered": picked_from_central_undelivered,
                 "total_delivered": len(all_delivered),
                 "delivered_today": delivered_today,
+                "total_unreachable": len(all_unreachable),
                 "total_sheets": len(sheets),
                 "enabled_sheets": len(enabled_sheets),
                 "per_sheet": list(per_sheet.values()),
             },
         }
+
+    @sqlite_retry()
+    def prefilter_supported_queue(self) -> Dict[str, Any]:
+        """
+        Pre-filters all non-delivered records against the 13 supported CARRIER_PREFIXES
+        BEFORE any airline network request is made.
+        Moves unsupported-prefix AWBs into SKIPPED (Table 3: Unreachable/Unsupported) with exact reason.
+        """
+        from bulk_tracker.extractor import CARRIER_PREFIXES, KNOWN_GLOBAL_IATA_PREFIXES
+
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        moved_unsupported = 0
+        supported_ready = 0
+
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT awb_clean, awb_no, status FROM master_awb_ledger WHERE status NOT IN ('DELIVERED', 'SKIPPED', 'UNREACHABLE', 'ERROR', 'NOT_FOUND');"
+            ).fetchall()
+
+            for row in rows:
+                clean = row["awb_clean"] or ""
+                prefix = clean[:3] if len(clean) >= 3 else ""
+                is_8_digit_indigo = len(clean) == 8 and clean.isdigit()
+                if (len(clean) >= 11 and prefix in CARRIER_PREFIXES) or is_8_digit_indigo:
+                    supported_ready += 1
+                else:
+                    if prefix in KNOWN_GLOBAL_IATA_PREFIXES:
+                        c_name, c_code = KNOWN_GLOBAL_IATA_PREFIXES[prefix]
+                        reason = f"Unsupported Airline: {c_name} ({c_code}, Prefix {prefix}) — Only 13 carriers supported"
+                    elif prefix:
+                        c_name = f"Unknown Carrier ({prefix})"
+                        reason = f"Unsupported Prefix {prefix} — Not in 13 supported carriers"
+                    else:
+                        c_name = "Invalid Format"
+                        reason = f"Invalid AWB format '{row['awb_no']}' — Expected 11-digit AWB"
+
+                    conn.execute(
+                        """
+                        UPDATE master_awb_ledger
+                        SET status = 'SKIPPED',
+                            carrier_name = ?,
+                            iata_prefix = ?,
+                            status_detail = ?,
+                            latest_activity = ?,
+                            unreachable_reason = ?,
+                            last_updated_at = ?
+                        WHERE awb_clean = ?;
+                        """,
+                        (c_name, prefix, reason, reason, reason, now_iso, clean),
+                    )
+                    moved_unsupported += 1
+            conn.commit()
+
+        return {
+            "supported_ready": supported_ready,
+            "moved_unsupported": moved_unsupported,
+        }
+
+    @sqlite_retry()
+    def mark_unreachable_reason(self, clean_awb: str, reason: str):
+        clean_key = self._clean_awb_key(clean_awb)
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE master_awb_ledger SET unreachable_reason = ?, last_updated_at = ? WHERE awb_clean = ?;",
+                (reason, now_iso, clean_key),
+            )
+            conn.commit()
+
+    @sqlite_retry()
+    def retry_unreachable_awb(self, clean_awb: Optional[str] = None) -> int:
+        """Moves an unreachable/error AWB (or all non-unsupported-prefix ones) back to PENDING in Table 1."""
+        from bulk_tracker.extractor import CARRIER_PREFIXES
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as conn:
+            if clean_awb:
+                clean_key = self._clean_awb_key(clean_awb)
+                cur = conn.execute(
+                    "UPDATE master_awb_ledger SET status = 'PENDING', unreachable_reason = NULL, status_detail = 'Re-queued for tracking', last_updated_at = ? WHERE awb_clean = ?;",
+                    (now_iso, clean_key),
+                )
+                conn.commit()
+                return cur.rowcount
+
+            rows = conn.execute(
+                "SELECT awb_clean FROM master_awb_ledger WHERE status IN ('UNREACHABLE', 'ERROR', 'NOT_FOUND', 'SKIPPED');"
+            ).fetchall()
+            requeued = 0
+            for r in rows:
+                c = r["awb_clean"] or ""
+                if (len(c) >= 11 and c[:3] in CARRIER_PREFIXES) or (len(c) == 8 and c.isdigit()):
+                    conn.execute(
+                        "UPDATE master_awb_ledger SET status = 'PENDING', unreachable_reason = NULL, status_detail = 'Re-queued for retry', last_updated_at = ? WHERE awb_clean = ?;",
+                        (now_iso, c),
+                    )
+                    requeued += 1
+            conn.commit()
+            return requeued
 
 
 # Global Singleton instance
